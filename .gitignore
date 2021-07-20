@@ -28,3 +28,21 @@ hs_err_pid*
 out.txt
 
 .settings/*
+dataset/reviews.7z
+dataset/metadata.7z
+dataset/reviewSports.txt
+dataset/reviewMusic.txt
+dataset/reviewMovie.txt
+dataset/reviewHome.txt
+dataset/reviewElectronics.txt
+dataset/reviewCars.txt
+dataset/reviewBooks.txt
+dataset/reviewAppliances.txt
+dataset/metaElectronics.txt
+dataset/metaHome.txt
+dataset/metaMovie.txt
+dataset/metaMusic.txt
+dataset/metaSports.txt
+dataset/metaCars.txt
+dataset/metaBooks.txt
+dataset/metaAppliances.txt

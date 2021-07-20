@@ -28,7 +28,7 @@ public class TermTyper {
 		//		"C:\\Users\\moult\\Development\\dataset\\typed-queries.txt");
 		
 		//We are going to get all of the facets for a particular file
-		Scanner scan = new Scanner(new File(FileResources.metaFiles[0]));
+		Scanner scan = new Scanner(new File(FileResources.metaFiles[1]));
 		CountedWords facets = new CountedWords();
 		int lineNo = 0;
 		while(scan.hasNextLine()) {
