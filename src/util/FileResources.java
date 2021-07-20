@@ -1,7 +1,7 @@
 package util;
 
 public class FileResources {
-	public static String fileRoot = "C:\\Users\\moult\\Development\\dataset\\";
+	public static String fileRoot = "dataset\\";
 	public static String[] types = {
 			"Appliances",	//0
 			"Movie",		//1

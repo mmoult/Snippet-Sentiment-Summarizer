@@ -10,6 +10,7 @@ import edu.stanford.nlp.ling.HasWord;
 import edu.stanford.nlp.ling.SentenceUtils;
 import edu.stanford.nlp.ling.TaggedWord;
 import edu.stanford.nlp.tagger.maxent.MaxentTagger;
+import util.FileResources;
 
 
 public class StanfordTagger implements PartOfSpeechTagger {
@@ -22,7 +23,7 @@ public class StanfordTagger implements PartOfSpeechTagger {
 	}
 	
 	public StanfordTagger() {
-		tagger = new MaxentTagger("C:\\Users\\moult\\Development\\dataset\\english-left3words-distsim.tagger");
+		tagger = new MaxentTagger(FileResources.fileRoot + "english-left3words-distsim.tagger");
 	}
 
 	@Override
@@ -38,6 +39,15 @@ public class StanfordTagger implements PartOfSpeechTagger {
 			for(String part: parts) {
 				String word = part.substring(0, part.indexOf('/'));
 				switch(part.substring(part.indexOf('/')+1)) {
+				case "ADD":
+				case "FW":
+				case "GW":
+				case "LS":
+				case "SYM":
+				case "TO":
+				case "UH":
+					pos.add(new Pair<>(word, EXTRA));
+					break;
 				case "AFX":
 					pos.add(new Pair<>(word, PREFIX));
 					break;
@@ -54,12 +64,17 @@ public class StanfordTagger implements PartOfSpeechTagger {
 				case "EX": //there can be practically any part of speech
 					pos.add(new Pair<>(word, ADV));
 					break;
-				case "FW":
-				case "LS":
-				case "SYM":
-				case "UH":
-				case "TO":
-					pos.add(new Pair<>(word, EXTRA));
+				case "HYPH":
+				case "NFP":
+				case "-RRB-":
+				case "-LRB-":
+				case ".":
+				case ",":
+				case ":":
+				case "$":
+				case "''":
+				case "``":
+					//don't add anything- these are punctuation
 					break;
 				case "IN":
 					pos.add(new Pair<>(word, PREP));
@@ -123,15 +138,6 @@ public class StanfordTagger implements PartOfSpeechTagger {
 				case "WP$":
 				case "WRB":
 					pos.add(new Pair<>(word, WH_INTEROG));
-					break;
-				case ".":
-				case ",":
-				case ":":
-				case "$":
-				case "''":
-				case "NFP":
-				case "HYPH":
-					//don't add anything- these are punctuation
 					break;
 				default: 
 					System.err.println("Could not identify: " + part.substring(part.indexOf('/')+1) +

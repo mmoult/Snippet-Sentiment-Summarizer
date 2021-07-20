@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.Set;
 
+import util.FileResources;
+
 public class DataCleaner {
 	protected static char sentenceSplitter = '|';
 	private Set<String> stopWords;
@@ -46,7 +48,7 @@ public class DataCleaner {
 	}
 	
 	public Set<String> getStopWords() throws FileNotFoundException {
-		Scanner scan = new Scanner(new File("C:\\Users\\moult\\Development\\dataset\\stopwords.txt"));
+		Scanner scan = new Scanner(new File(FileResources.fileRoot+"stopwords.txt"));
 		HashSet<String> stopWords = new HashSet<>();
 		
 		while(scan.hasNext()) {
