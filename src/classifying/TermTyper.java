@@ -28,14 +28,14 @@ public class TermTyper {
 		//		"C:\\Users\\moult\\Development\\dataset\\typed-queries.txt");
 		
 		//We are going to get all of the facets for a particular file
-		Scanner scan = new Scanner(new File(FileResources.metaFiles[1]));
+		Scanner scan = new Scanner(new File(FileResources.metaFiles[5]));
 		CountedWords facets = new CountedWords();
 		int lineNo = 0;
 		while(scan.hasNextLine()) {
 			String line = scan.nextLine();
 			lineNo++;
 			if(lineNo % 1000 == 0)
-				System.out.println("Cleaning... (" + lineNo + ")");
+				System.out.println("Processing... (" + lineNo + ")");
 			//if(lineNo > 5000)
 			//	break;
 			

@@ -7,7 +7,8 @@ import java.io.InputStreamReader;
 public class CoreferenceResolver {
 	
 	public static String resolve(String sentence) {
-		final String pythPath = "C:\\Users\\moult\\AppData\\Local\\Programs\\Python\\Python37\\python.exe";
+		//If python is already saved on the path, we do not need to provide a specific location
+		final String pythPath = "python";
 		ProcessBuilder processBuilder = new ProcessBuilder(pythPath, "src\\coreference\\coreference.py", sentence);
 		processBuilder.redirectErrorStream(true);
 		
