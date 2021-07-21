@@ -61,6 +61,7 @@ System.out.println("PRODUCTS RETRIEVED (" + result.size()+")=");
 		int done = 0;
 		for(Document doc: rankedReviews) {
 			//perform coreference resolution before sentence ranking
+			//TODO we could potentially use multi-threading to speed up this part since it is so slow
 			doc.setText(CoreferenceResolver.resolve(doc.getText()));
 			done++;
 			System.out.print("Resolving coreferences: "+ ((done*100)/rankedReviews.size())+"%  \r");
