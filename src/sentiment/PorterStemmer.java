@@ -11,6 +11,7 @@ package sentiment;
     M.F. Porter (1980), _Program_, Vol. 14, No. 3, pp. 130-137
 
 ***************************************************************
+// Slight alterations made on 2021 July 22 to make stemmed words resemble real words.
 */
 
 public class PorterStemmer {
@@ -31,7 +32,7 @@ public class PorterStemmer {
         }
         str = step1a(str);
         str = step1b(str);
-        str = step1c(str);
+        //str = step1c(str); end Y -> I
         str = step2(str);
         str = step3(str);
         str = step4(str);
@@ -44,9 +45,10 @@ public class PorterStemmer {
         // SSES -> SS
         if (str.endsWith("sses")) {
             return str.substring(0, str.length() - 2);
-        // IES -> I
+        // IES -> Y //changed here from I -> Y
         } else if (str.endsWith("ies")) {
-            return str.substring(0, str.length() - 2);
+            //return str.substring(0, str.length() - 2);
+        	return str.substring(0, str.length() - 3)  + 'y';
         // SS -> S
         } else if (str.endsWith("ss")) {
             return str;

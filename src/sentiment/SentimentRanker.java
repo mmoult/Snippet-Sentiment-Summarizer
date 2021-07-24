@@ -32,10 +32,12 @@ public class SentimentRanker {
 		//evaluate here how good the document retrieval was
 System.out.println("PRODUCTS RETRIEVED (" + result.size()+")=");
 //FileWriter temp = new FileWriter("out.txt");
-/*for(Document doc: result) {
+int iii=0;
+for(Document doc: result) {
 	//temp.write(doc.toString() + '\n');
-	System.out.println(doc);
-}*/
+	System.out.println("[" + (++iii) + "] " + doc.getText());
+}
+System.exit(0);
 //temp.close();
 
 		System.out.println("Retrieving reviews...");

@@ -28,4 +28,8 @@ public class SentiScore {
 	public double getObjective() {
 		return objective;
 	}
+	
+	public String toString() {
+		return "[+" + positive + " -" + negative+"]";
+	}
 }

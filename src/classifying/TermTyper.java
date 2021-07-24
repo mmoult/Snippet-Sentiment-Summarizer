@@ -28,7 +28,8 @@ public class TermTyper {
 		//		"C:\\Users\\moult\\Development\\dataset\\typed-queries.txt");
 		
 		//We are going to get all of the facets for a particular file
-		Scanner scan = new Scanner(new File(FileResources.metaFiles[5]));
+		Depluralizer stemmer = new Depluralizer();
+		Scanner scan = new Scanner(new File(FileResources.metaFiles[0]));
 		CountedWords facets = new CountedWords();
 		int lineNo = 0;
 		while(scan.hasNextLine()) {
@@ -36,20 +37,39 @@ public class TermTyper {
 			lineNo++;
 			if(lineNo % 1000 == 0)
 				System.out.println("Processing... (" + lineNo + ")");
-			//if(lineNo > 5000)
-			//	break;
+if(lineNo > 5000)
+	break;
 			
 			String matchOn = "\"words\": ";
 			if(!line.contains(matchOn))
 				continue;
-			
+
+// Stemming in any form will reduce redundancies, but in the process it will create word stems
+// that are not fit for display.
+final boolean STEM = false;
+
 			String doc = line.substring(line.indexOf(matchOn) + matchOn.length());
 			List<Pair<String, TermType>> words = typer.typeWords(doc);
-			for(Pair<String, TermType> word: words) {
-				if(word.second == TermType.FACET)
+			for(Pair<String, TermType> term: words) {
+				if(term.second == TermType.FACET) {
 					//right now, we could still get duplicate words. We should stem them, but
-					//still keep track of the original. We will need another util class for this
-					facets.addWord(word.first.toLowerCase());
+					//still keep track of the original.
+					String normTerm = term.first.toLowerCase();
+					
+					if(STEM) {
+						//stem the last word (if any)
+						int lastBegin = normTerm.lastIndexOf(' ');
+						if(lastBegin == -1) { //no spaces
+							normTerm = stemmer.stem(normTerm);
+						}else {
+							//only stem the last word (since that is where plurals tend to reside)
+							String prefix = normTerm.substring(0, lastBegin);
+							normTerm = prefix + stemmer.stem(normTerm.substring(lastBegin+1));
+						}
+					}
+					
+					facets.addWord(normTerm);
+				}
 			}
 		}
 		
@@ -63,8 +83,15 @@ public class TermTyper {
 			return Integer.compare(-facets.getOccurrences(o1), -facets.getOccurrences(o2));
 		});
 		
-		for(String word: commonFacets) {
-			System.out.println("  " + word + ": " + facets.getOccurrences(word));
+		for(int i=0; i<commonFacets.size(); i++) {
+			String word = commonFacets.get(i);
+			//skip all that only have one occurrence
+			int occ = facets.getOccurrences(word);
+			if(occ == 1) {
+				System.out.println("... " + (commonFacets.size() - i) + " ommitted single-occurrence facets");
+				break;
+			}
+			System.out.println("  " + word + ": " + occ);
 		}
 		//System.out.println(facets);
 	}
@@ -94,6 +121,9 @@ public class TermTyper {
 		System.out.println("Finished!");
 	}
 	
+	protected List<Pair<String, TermType>> typedWords;
+	protected StringBuilder facet;
+	
 	public List<Pair<String, TermType>> typeWords(String sentence) {
 		DataCleaner cleaner = new DataCleaner();
 		
@@ -121,11 +151,13 @@ public class TermTyper {
 		List<Pair<String, PartOfSpeech>> posList = tagger.identify(sentence);
 		int i = 0;
 		
-		List<Pair<String, TermType>> toReturn = new ArrayList<>();
+		typedWords = new ArrayList<>();
 		
 		StringBuilder object = new StringBuilder();
 		boolean definitiveArticle = false;
 		boolean objectPhrase = false;
+		facet = new StringBuilder();
+		
 		short afterQuantifier = 0; //quantifiers such as much or many come before facets
 		for(int k=0; k<words.length; k++) {
 			String word = words[k];
@@ -147,7 +179,7 @@ public class TermTyper {
 			if(pos == PartOfSpeech.ARTICLE) {
 				definitiveArticle = word.toLowerCase().equals("the");
 				objectPhrase = true;
-				toReturn.add(new Pair<>(word, TermType.NONE));
+				addTerm(word, TermType.NONE);
 				continue;
 			}
 			//if this is a verb or a preposition
@@ -159,7 +191,7 @@ public class TermTyper {
 				objectPhrase = false;
 				//flush if any
 				if(object.length() > 0) {
-					toReturn.add(new Pair<>(object.toString(), TermType.PRODUCT));
+					typedWords.add(new Pair<>(object.toString(), TermType.PRODUCT));
 					object = new StringBuilder();
 				}
 			}
@@ -170,7 +202,7 @@ public class TermTyper {
 			
 			//first check that it is not a stop word
 			if(cleaner.isStopWord(word.toLowerCase())) {
-				toReturn.add(new Pair<>(word, TermType.NONE));
+				addTerm(word, TermType.NONE);
 				continue;
 			}
 			
@@ -195,15 +227,19 @@ public class TermTyper {
 					pos == PartOfSpeech.NOUN_PROPER || pos == PartOfSpeech.NOUN_PROPER_PL) {
 				
 				//If the noun comes immediately after a quantifier, we assume that it is a facet.
-				//If the noun is plural, we guess facet, unless it is the last word in the query
-				//(Users commonly make the last word plural since they want several results.)
+				//
 				
-				if((pos == PartOfSpeech.NOUN_PROPER || pos == PartOfSpeech.NOUN_PROPER_PL ||
-						pos == PartOfSpeech.NOUN || k==words.length-1) && afterQuantifier!=1) {
-					toReturn.add(new Pair<>(word, TermType.PRODUCT));
+				//If it comes after a quantifier or is a noun after a facet phrase, we guess it
+				//is a facet. Or if it is a plural non-proper noun, unless it is the last word
+				//in the query (Users commonly make the last word plural since they want several
+				//results.)
+				//Otherwise, we guess that it is a product
+				if(afterQuantifier == 1 || facet.length()>0 || (pos == PartOfSpeech.NOUN_PL &&
+						k!=words.length-1)) {
+					addTerm(word, TermType.FACET);
 					continue;
 				}else {
-					toReturn.add(new Pair<>(word, TermType.FACET));
+					addTerm(word, TermType.PRODUCT);
 					continue;
 				}
 			}
@@ -211,26 +247,44 @@ public class TermTyper {
 			//if it is an adjective, then either sentiment or facet
 			if(pos == PartOfSpeech.ADJ_COMPARE || pos == PartOfSpeech.ADJ_SUPER ||
 					pos == PartOfSpeech.ADJ) {
-				if(analyzer.querySentiment(word) != null)
-					toReturn.add(new Pair<>(word, TermType.SENTIMENT));
+				if(analyzer.querySentiment(word.toLowerCase()) != null)
+					addTerm(word, TermType.SENTIMENT);
 				else
-					toReturn.add(new Pair<>(word, TermType.FACET));
+					addTerm(word, TermType.FACET);
 				continue;
 			}
 			
 			//now we just try for sentiment, regardless of part of speech
-			if(analyzer.querySentiment(word) != null) {
-				toReturn.add(new Pair<>(word, TermType.SENTIMENT));
+			if(analyzer.querySentiment(word.toLowerCase()) != null) {
+				addTerm(word, TermType.SENTIMENT);
 			}else {
 				//if we could not place it otherwise, we conclude none
-				toReturn.add(new Pair<>(word, TermType.NONE));
+				addTerm(word, TermType.NONE);
 			}
 		}
 		//flush out from any product phrase
 		if(object.length() > 0)
-			toReturn.add(new Pair<>(object.toString(), TermType.PRODUCT));
+			typedWords.add(new Pair<>(object.toString(), TermType.PRODUCT));
+		//flush out any facet phrase
+		if(facet.toString().length() > 0) { //if a facet is not being pushed, break the facet phrase
+			typedWords.add(new Pair<>(facet.toString(), TermType.FACET));
+			facet.setLength(0); //clear out the old phrase
+		}
 		
-		return toReturn;
+		return typedWords;
+	}
+	
+	private void addTerm(String word, TermType type) {
+		if(type == TermType.FACET) {
+			//append it to facet phrase
+			if(facet.toString().length() > 0)
+				facet.append(' ');
+			facet.append(word);
+		}else if(facet.toString().length() > 0) { //if a facet is not being pushed, break the facet phrase
+			typedWords.add(new Pair<>(facet.toString(), TermType.FACET));
+			facet.setLength(0); //clear out the old phrase
+		}
+		typedWords.add(new Pair<>(word, type));
 	}
 
 }

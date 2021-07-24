@@ -36,4 +36,8 @@ public class Sentiment {
 	public SentiScore getScore() {
 		return score;
 	}
+	
+	public String toString() {
+		return "sentiment id:" + id +" "+ score.toString();
+	}
 }
