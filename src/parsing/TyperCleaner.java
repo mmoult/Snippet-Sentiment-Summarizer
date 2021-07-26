@@ -5,7 +5,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Scanner;
 
-import util.FileResources;
+import util.AmazonFileResources;
 
 public class TyperCleaner extends DataCleaner {
 	protected static final String allQueryTypes = "orcas-doctrain-queries.tsv";
@@ -13,8 +13,8 @@ public class TyperCleaner extends DataCleaner {
 	protected static final String prodQueries = "product-queries.tsv";
 	
 	public static void main(String args[]) throws IOException {
-		new SvmCleaner().clean(FileResources.fileRoot + prodQueries,
-				FileResources.fileRoot + "queries.txt", 1000);
+		new SvmCleaner().clean(AmazonFileResources.fileRoot + prodQueries,
+				AmazonFileResources.fileRoot + "queries.txt", 1000);
 	}
 	
 	public void clean(String inFile, String outFile, int lineCap) throws IOException {

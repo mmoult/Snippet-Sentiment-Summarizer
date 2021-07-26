@@ -10,7 +10,7 @@ import edu.stanford.nlp.ling.HasWord;
 import edu.stanford.nlp.ling.SentenceUtils;
 import edu.stanford.nlp.ling.TaggedWord;
 import edu.stanford.nlp.tagger.maxent.MaxentTagger;
-import util.FileResources;
+import util.AmazonFileResources;
 
 
 public class StanfordTagger implements PartOfSpeechTagger {
@@ -23,7 +23,7 @@ public class StanfordTagger implements PartOfSpeechTagger {
 	}
 	
 	public StanfordTagger() {
-		tagger = new MaxentTagger(FileResources.fileRoot + "english-left3words-distsim.tagger");
+		tagger = new MaxentTagger(AmazonFileResources.fileRoot + "english-left3words-distsim.tagger");
 	}
 
 	@Override

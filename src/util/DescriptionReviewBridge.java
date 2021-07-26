@@ -8,8 +8,8 @@ public class DescriptionReviewBridge {
 	
 	public List<String> getReviewsForAsin(String file, String asin) {
 		int type = -1;
-		for(int i=0; i<FileResources.types.length; i++) {
-			if(file.contains(FileResources.types[i])) {
+		for(int i=0; i<AmazonFileResources.types.length; i++) {
+			if(file.contains(AmazonFileResources.types[i])) {
 				type = i;
 				break;
 			}
@@ -19,7 +19,7 @@ public class DescriptionReviewBridge {
 			return null;
 		}
 		
-		Scanner scan = new Scanner(FileResources.reviewFiles[type]);
+		Scanner scan = new Scanner(AmazonFileResources.reviewFiles[type]);
 		List<String> reviews = new ArrayList<>();
 		while(scan.hasNextLine()) {
 			String line = scan.nextLine();

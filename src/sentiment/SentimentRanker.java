@@ -15,7 +15,7 @@ import classifying.CountedWords;
 import coreference.CoreferenceResolver;
 import parsing.DataCleaner;
 import util.AsinBridge;
-import util.FileResources;
+import util.AmazonFileResources;
 
 public class SentimentRanker {
 	protected SentimentAnalyzer analyzer;
@@ -27,7 +27,7 @@ public class SentimentRanker {
 		List<String> goodWords = cleanQuery(QUERY);
 		Classifier classifer = new Classifier(false);
 		int file = classifer.classify(goodWords);
-		System.out.println("Searching in " + FileResources.metaFiles[file] + " for \"" + QUERY + "\".");
+		System.out.println("Searching in " + AmazonFileResources.metaFiles[file] + " for \"" + QUERY + "\".");
 		List<Document> result = ranker.rankDocRelevance(goodWords, 100, 784, file);
 		//evaluate here how good the document retrieval was
 System.out.println("PRODUCTS RETRIEVED (" + result.size()+")=");
@@ -170,7 +170,7 @@ for(int i=0; i<rankedReviews.size(); i++) {
 	 * shorter. In other words, irrelevant documents will not be returned just to meet the specified
 	 * number here.
 	 * @param toSearch the number of lines to search in the file
-	 * @param file the file index in {@link FileResources}.
+	 * @param file the file index in {@link AmazonFileResources}.
 	 * @return a list of at most <code>topHowMany</code> documents that were found to be relevant
 	 * to the query. Sorted by descending relevance.
 	 * @throws FileNotFoundException If the metafile read from cannot be found
@@ -178,7 +178,7 @@ for(int i=0; i<rankedReviews.size(); i++) {
 	public List<Document> rankDocRelevance(List<String> query, int topHowMany, int toSearch, int file) 
 			throws FileNotFoundException {
 		List<String> lines = new ArrayList<>(toSearch);
-		Scanner scan = new Scanner(new File(FileResources.metaFiles[file]));
+		Scanner scan = new Scanner(new File(AmazonFileResources.metaFiles[file]));
 		for(int j=0; j<toSearch; j++) {
 			if(scan.hasNextLine()) {
 				String line = scan.nextLine();

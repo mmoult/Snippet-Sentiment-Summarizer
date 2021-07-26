@@ -16,7 +16,7 @@ public class AsinBridge {
 	
 	public AsinBridge(int file, PorterStemmer stem) throws FileNotFoundException {
 		//load the documents and save them according to asin in a set
-		Scanner scan = new Scanner(new File(FileResources.reviewFiles[file]));
+		Scanner scan = new Scanner(new File(AmazonFileResources.reviewFiles[file]));
 		documents = new HashMap<>();
 		while(scan.hasNextLine()) {
 			String line = scan.nextLine();

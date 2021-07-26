@@ -10,10 +10,10 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.TreeMap;
 
-import util.FileResources;
+import util.AmazonFileResources;
 
 public class SentimentAnalyzer {
-	public static String path = FileResources.fileRoot + "trimmed-senti-list.txt";
+	public static String path = AmazonFileResources.fileRoot + "trimmed-senti-list.txt";
 	protected Map<String, List<Sentiment>> sentimentBank;
 	
 	

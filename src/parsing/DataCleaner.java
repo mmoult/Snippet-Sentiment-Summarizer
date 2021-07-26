@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.Set;
 
-import util.FileResources;
+import util.AmazonFileResources;
 
 public class DataCleaner {
 	protected static char sentenceSplitter = '|';
@@ -48,7 +48,7 @@ public class DataCleaner {
 	}
 	
 	public Set<String> getStopWords() throws FileNotFoundException {
-		Scanner scan = new Scanner(new File(FileResources.fileRoot+"stopwords.txt"));
+		Scanner scan = new Scanner(new File(AmazonFileResources.fileRoot+"stopwords.txt"));
 		HashSet<String> stopWords = new HashSet<>();
 		
 		while(scan.hasNext()) {
@@ -69,26 +69,47 @@ public class DataCleaner {
 		reviewLine = reviewLine.replace("\\t", " ");
 		reviewLine = reviewLine.replace('\\', ' ');
 		reviewLine = reviewLine.replace("--", " ");
-		reviewLine = reviewLine.replace("''", " ");
+		reviewLine = reviewLine.replace(":", " ");
+		reviewLine = reviewLine.replace(" - ", " ");
+		reviewLine = reviewLine.replace(" ' ", " ");
 		reviewLine = reviewLine.replace("...", ".");
 		reviewLine = reviewLine.replace('|', ' ');
 		reviewLine = removeHtmlTags(reviewLine);
 		
 		//all the different punctuation to remove
-		char[] punctuation = {'.', '!', '?', ';', 
-				',', '(', ')', '[', ']', ':', '&', '{', '}', '*', '#', '%', '@'};
-		for(int i=0; i<punctuation.length; i++) {
-			char c = punctuation[i];
+		char[] sentPunctuation = {'.', '!', '?', ';'};
+		for(int i=0; i<sentPunctuation.length; i++) {
+			char c = sentPunctuation[i];
 			int index = reviewLine.indexOf(c);
 			while(index != -1) {
 				reviewLine = reviewLine.substring(0, index) +
-						//i<4 since those are the sentence punctuation marks
-						((sentenceDivision && i<4)? " " + sentenceSplitter + " " : ' ') +
+						//sentence punctuation marks
+						((sentenceDivision)? " " + sentenceSplitter + " " : ' ') +
 						reviewLine.substring(index + 1);
 				index = reviewLine.indexOf(c);
 			}
 		}
-		return reviewLine;
+		
+		//All other non-letter or number characters (except - ' |) should be stripped at this point
+		StringBuilder line = new StringBuilder();
+		boolean lastSpace = false; //cannot have more than 1 space in a row
+		boolean emptySentence = true; //a sentence must have more than space to remain
+		for(char c: reviewLine.toCharArray()) {
+			if(Character.isWhitespace(c) && !lastSpace) {
+				lastSpace = true;
+			}else if(Character.isLetterOrDigit(c) || c=='-' || c=='\'') {
+				lastSpace = false;
+				emptySentence = false;
+			}else if(!emptySentence && c =='|') {
+				emptySentence = true;
+				lastSpace = false;
+			}else 
+				continue;
+			
+			//if it did meet one of the criteria, append
+			line.append(c);
+		}
+		return line.toString();
 	}
 	public static String removeHtmlTags(String line) {
 		line = line.replace("&nbsp;", "_")

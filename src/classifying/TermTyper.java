@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
@@ -12,7 +13,7 @@ import java.util.Set;
 import classifying.PartOfSpeechTagger.PartOfSpeech;
 import parsing.DataCleaner;
 import sentiment.SentimentAnalyzer;
-import util.FileResources;
+import util.OpinRankFiles;
 
 public class TermTyper {
 	private SentimentAnalyzer analyzer;
@@ -24,12 +25,13 @@ public class TermTyper {
 	
 	public static void main(String args[]) throws IOException {
 		TermTyper typer = new TermTyper();
-		//typer.typeFile("C:\\Users\\moult\\Development\\dataset\\queries.txt",
-		//		"C:\\Users\\moult\\Development\\dataset\\typed-queries.txt");
 		
 		//We are going to get all of the facets for a particular file
 		Depluralizer stemmer = new Depluralizer();
-		Scanner scan = new Scanner(new File(FileResources.metaFiles[0]));
+// Stemming in any form will reduce redundancies, but in the process it will create word stems
+// that are not fit for display.
+final boolean STEM = true;
+		Scanner scan = new Scanner(new File(OpinRankFiles.carFile+"2007" +File.separator+ "volvo_c70.txt"));
 		CountedWords facets = new CountedWords();
 		int lineNo = 0;
 		while(scan.hasNextLine()) {
@@ -44,12 +46,9 @@ if(lineNo > 5000)
 			if(!line.contains(matchOn))
 				continue;
 
-// Stemming in any form will reduce redundancies, but in the process it will create word stems
-// that are not fit for display.
-final boolean STEM = false;
 
 			String doc = line.substring(line.indexOf(matchOn) + matchOn.length());
-			List<Pair<String, TermType>> words = typer.typeWords(doc);
+			List<Pair<String, TermType>> words = typer.typeReviewWords(doc);
 			for(Pair<String, TermType> term: words) {
 				if(term.second == TermType.FACET) {
 					//right now, we could still get duplicate words. We should stem them, but
@@ -64,7 +63,7 @@ final boolean STEM = false;
 						}else {
 							//only stem the last word (since that is where plurals tend to reside)
 							String prefix = normTerm.substring(0, lastBegin);
-							normTerm = prefix + stemmer.stem(normTerm.substring(lastBegin+1));
+							normTerm = prefix + " " + stemmer.stem(normTerm.substring(lastBegin+1));
 						}
 					}
 					
@@ -91,6 +90,14 @@ final boolean STEM = false;
 				System.out.println("... " + (commonFacets.size() - i) + " ommitted single-occurrence facets");
 				break;
 			}
+			//also we want to filter out a couple of subject-specific banned words
+			List<String> banned = Arrays.asList("car", "people");
+			if(STEM) {
+				for(int j=0; j<banned.size(); j++)
+					banned.set(j, stemmer.stem(banned.get(j)));
+			}
+			if(banned.contains(word.toLowerCase()))
+				continue;
 			System.out.println("  " + word + ": " + occ);
 		}
 		//System.out.println(facets);
@@ -121,15 +128,189 @@ final boolean STEM = false;
 		System.out.println("Finished!");
 	}
 	
+	public List<Pair<String, TermType>> typeReviewWords(String sentence) {
+		//This method is highly tuned for product reviews. Since this should be the description
+		// text, we should only rarely encounter product words. Almost all nouns will be sorted
+		// as facets instead.
+		
+		DataCleaner cleaner = new DataCleaner();
+		
+		//the tagger can get confused when it encounters numbers by themselves. Therefore,
+		//we remove them for this
+		String[] words = sentence.replace(" | ", ". ").split(" ");
+		StringBuilder newSentence = new StringBuilder();
+		boolean first = true;
+		for(String word: words) {
+			try {
+				Double.parseDouble(word);
+				//if that worked, then we don't include this number "word"
+			}catch(NumberFormatException e) {
+				//if it failed, then it must have some text component to include
+				if(first)
+					first = false;
+				else
+					newSentence.append(' ');
+				newSentence.append(word);
+			}
+		}
+		sentence = newSentence.toString();
+		
+		List<Pair<String, PartOfSpeech>> posList = tagger.identify(sentence);
+		int i = 0;
+		
+		typedWords = new ArrayList<>();
+		
+		StringBuilder object = new StringBuilder();
+		boolean definitiveArticle = false;
+		boolean objectPhrase = false;
+		TermType phraseType = TermType.FACET;
+		facet = new StringBuilder();
+		
+		short afterQuantifier = 0; //quantifiers such as much or many come before facets
+		for(int k=0; k<words.length; k++) {
+			String word = words[k];
+			
+			//find the matching part of speech from the tagger
+			int ii=i;
+			for(; ii<posList.size(); ii++) {
+				//if the tagged word in its entirety starts at index 0 of this word, then they are
+				//the same word (the tagger word can be truncated)
+				if(word.indexOf(posList.get(ii).first) == 0)
+					break;
+			}
+			if(ii >= posList.size())
+				continue; //there was some error. Happens on numbers, so skip
+			i = ii;
+			
+			if(word.charAt(word.length()-1) == '.')
+				word = word.substring(0, word.length()-1);
+			PartOfSpeech pos = posList.get(i).second;
+			if(afterQuantifier > 0)
+				afterQuantifier--;
+			
+			//System.out.println(posList.get(i).first + " " + pos);
+			if(pos == PartOfSpeech.ARTICLE || pos == PartOfSpeech.PRON_POS) {
+				if(objectPhrase) {
+					//if we are already in a phrase, break and push
+					objectPhrase = false;
+					//flush if any
+					if(object.length() > 0) {
+						typedWords.add(new Pair<>(object.toString(), phraseType));
+						object = new StringBuilder();
+					}
+				}
+				definitiveArticle = word.toLowerCase().equals("the");
+				objectPhrase = true;
+				//if the phrase begins with 'this', then it is talking about the product
+				phraseType = TermType.FACET;
+				if(pos == PartOfSpeech.PRON_POS)
+					phraseType = TermType.NONE; //probably some other personal thing
+				if(word.toLowerCase().equals("this"))
+					phraseType = TermType.PRODUCT;
+				addTerm(word, TermType.NONE);
+				continue;
+			}
+			//if this is a verb or a preposition
+			// verb: what does the {power steering switch} do
+			// preposition: where is a {good place} in Salt Lake City.
+			// conjunction: one ride in the {fast mercedes} and we were hooked 
+			//then the after article object phrase has ended
+			if(objectPhrase &&
+					(pos == PartOfSpeech.VERB || pos == PartOfSpeech.PREP || pos == PartOfSpeech.CONJ)) {
+				objectPhrase = false;
+				//flush if any
+				if(object.length() > 0) {
+					typedWords.add(new Pair<>(object.toString(), phraseType));
+					object = new StringBuilder();
+				}
+			}
+			
+			//try to find products and facets
+			if(objectPhrase) {
+				//test if it is an adjective
+				if(pos != PartOfSpeech.ADJ_COMPARE && pos != PartOfSpeech.ADJ_SUPER &&
+						(definitiveArticle || pos != PartOfSpeech.ADJ)) {
+					//If it is not a definitive article and just a regular adjective, then it
+					//could be sentiment or facet
+					
+					//we add this as part of the object phrase
+					if(object.length() > 0)
+						object.append(' ');
+					object.append(word);
+					continue;
+				}
+			}
+			
+			//first check that it is not a stop word
+			if(cleaner.isStopWord(word.toLowerCase())) {
+				addTerm(word, TermType.NONE);
+				continue;
+			}
+				
+			//if it is not part of an object phrase, it could still be a noun
+			//All nouns are considered facets EXCEPT for capitalized non-acronyms.
+			if(pos == PartOfSpeech.NOUN || pos == PartOfSpeech.NOUN_PL ||
+					pos == PartOfSpeech.NOUN_PROPER || pos == PartOfSpeech.NOUN_PROPER_PL) {
+				
+				if(pos == PartOfSpeech.NOUN_PROPER || pos == PartOfSpeech.NOUN_PROPER_PL
+						&& !isAcronym(word)) {
+					addTerm(word, TermType.PRODUCT);
+				}else {
+					addTerm(word, TermType.FACET);
+					continue;
+				}
+			}
+			
+			//if it is an adjective, then either sentiment or facet
+			if(pos == PartOfSpeech.ADJ_COMPARE || pos == PartOfSpeech.ADJ_SUPER ||
+					pos == PartOfSpeech.ADJ) {
+				if(analyzer.querySentiment(word.toLowerCase()) != null)
+					addTerm(word, TermType.SENTIMENT);
+				else
+					addTerm(word, TermType.FACET);
+				continue;
+			}
+			
+			//now we just try for sentiment, regardless of part of speech
+			if(analyzer.querySentiment(word.toLowerCase()) != null) {
+				addTerm(word, TermType.SENTIMENT);
+			}else {
+				//if we could not place it otherwise, we conclude none
+				addTerm(word, TermType.NONE);
+			}
+		}
+		//flush out from any product phrase
+		if(object.length() > 0)
+			typedWords.add(new Pair<>(object.toString(), phraseType));
+		//flush out any facet phrase
+		if(facet.toString().length() > 0) { //if a facet is not being pushed, break the facet phrase
+			typedWords.add(new Pair<>(facet.toString(), TermType.FACET));
+			facet.setLength(0); //clear out the old phrase
+		}
+		
+		return typedWords;
+	}
+	
+	protected boolean isAcronym(String word) {
+		//the way that we will guess if it is an acronym is if more than 50% of the letters are caps
+		//Remember that come acronyms have lower-case components.
+		int cap = 0;
+		for(char c: word.toCharArray()) {
+			if((Character.isLetter(c) && Character.isUpperCase(c)) || !Character.isLetter(c))
+				cap++;
+		}
+		return (cap / (double)word.length()) > 0.5;
+	}
+	
 	protected List<Pair<String, TermType>> typedWords;
 	protected StringBuilder facet;
-	
+	/** This is a generic method for typing any kind of sentence. */
 	public List<Pair<String, TermType>> typeWords(String sentence) {
 		DataCleaner cleaner = new DataCleaner();
 		
 		//the tagger can get confused when it encounters numbers by themselves. Therefore,
 		//we remove them for this
-		String[] words = sentence.replace('|', '.').split(" ");
+		String[] words = sentence.replace(" | ", " ").split(" ");
 		StringBuilder newSentence = new StringBuilder();
 		boolean first = true;
 		for(String word: words) {

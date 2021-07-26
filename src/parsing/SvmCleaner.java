@@ -5,15 +5,15 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Scanner;
 
-import util.FileResources;
+import util.AmazonFileResources;
 
 public class SvmCleaner extends DataCleaner {
 	protected static final String allQueryTypes = "orcas-doctrain-queries.tsv";
 	protected static final String trainQueries = "queries.train.tsv";
 	
 	public static void main(String args[]) throws IOException {
-		new SvmCleaner().clean(FileResources.fileRoot + trainQueries,
-				FileResources.fileRoot + "svm-data-raw.txt", 1000);
+		new SvmCleaner().clean(AmazonFileResources.fileRoot + trainQueries,
+				AmazonFileResources.fileRoot + "svm-data-raw.txt", 1000);
 	}
 	
 	public void clean(String inFile, String outFile, int lineCap) throws IOException {

@@ -5,21 +5,21 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Scanner;
 
-import util.FileResources;
+import util.AmazonFileResources;
 
 public class MetadataCleaner extends DataCleaner {
 	private int PROGRESS_BIG = 1000;
 	private int PROGRESS_SMALL = 9;
 	
-	private static String prefix = FileResources.fileRoot;
+	private static String prefix = AmazonFileResources.fileRoot;
 	private static String[] inFiles;
 	static {
-		inFiles = new String[FileResources.types.length];
-		for(int i=0; i<FileResources.types.length; i++) {
-			inFiles[i] = prefix + "meta_" + FileResources.types[i] + ".json";
+		inFiles = new String[AmazonFileResources.types.length];
+		for(int i=0; i<AmazonFileResources.types.length; i++) {
+			inFiles[i] = prefix + "meta_" + AmazonFileResources.types[i] + ".json";
 		}
 	}
-	private static String[] outFiles = FileResources.metaFiles;
+	private static String[] outFiles = AmazonFileResources.metaFiles;
 	
 	public static void main(String args[]) {
 		MetadataCleaner cleaner = new MetadataCleaner();

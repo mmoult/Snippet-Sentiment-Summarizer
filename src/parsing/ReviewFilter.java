@@ -7,7 +7,7 @@ import java.util.HashSet;
 import java.util.Scanner;
 import java.util.Set;
 
-import util.FileResources;
+import util.AmazonFileResources;
 
 public class ReviewFilter {
 	
@@ -22,8 +22,8 @@ public class ReviewFilter {
 		
 		//first we have to load the metadata file
 		Set<String> asins = new HashSet<>();
-		System.out.println("Reading asins from " + FileResources.metaFiles[file]);
-		Scanner scan = new Scanner(new File(FileResources.metaFiles[file]));
+		System.out.println("Reading asins from " + AmazonFileResources.metaFiles[file]);
+		Scanner scan = new Scanner(new File(AmazonFileResources.metaFiles[file]));
 		String asinToken = "\"asin\": \"";
 		while(scan.hasNextLine()) {
 			String line = scan.nextLine();
@@ -36,11 +36,11 @@ public class ReviewFilter {
 		scan.close();
 		
 		//now we go through the file to filter
-		String toFilter = FileResources.fileRoot + "review_" + FileResources.types[file] + ".json";
+		String toFilter = AmazonFileResources.fileRoot + "review_" + AmazonFileResources.types[file] + ".json";
 		scan = new Scanner(new File(toFilter));
 		System.out.println("Filtering " + toFilter);
-		FileWriter write = new FileWriter(new File(FileResources.fileRoot+outFile));
-		System.out.println("Printing to " + FileResources.fileRoot+outFile);
+		FileWriter write = new FileWriter(new File(AmazonFileResources.fileRoot+outFile));
+		System.out.println("Printing to " + AmazonFileResources.fileRoot+outFile);
 		
 		int updateDelta = 100000;
 		int lineNo = 0;

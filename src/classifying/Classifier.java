@@ -7,10 +7,10 @@ import java.util.List;
 import java.util.Scanner;
 
 import parsing.DataCleaner;
-import util.FileResources;
+import util.AmazonFileResources;
 
 public class Classifier {
-	private static String[] metaFiles = FileResources.metaFiles;
+	private static String[] metaFiles = AmazonFileResources.metaFiles;
 	private List<CountedWords> classes = new ArrayList<>(metaFiles.length);
 	private List<List<CountedWords>> entries = new ArrayList<>(metaFiles.length);
 	private double[] pC = new double[metaFiles.length];
