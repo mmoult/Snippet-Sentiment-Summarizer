@@ -32,8 +32,15 @@ public class CountedWords {
 		return size;
 	}
 	
-	public Set<String> getDistinctWords() {
+	public Set<String> getDistinct() {
 		return map.keySet();
+	}
+	/**
+	 * @deprecated replaced by {@link #getDistinct()}
+	 * @return the set of distinct strings that have been added to this map
+	 */
+	public Set<String> getDistinctWords() {
+		return getDistinct();
 	}
 	
 	public int getDistinctSize() {

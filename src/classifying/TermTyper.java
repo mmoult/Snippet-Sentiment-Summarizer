@@ -1,11 +1,12 @@
 package classifying;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
 import java.util.Set;
@@ -15,6 +16,11 @@ import parsing.DataCleaner;
 import sentiment.SentimentAnalyzer;
 import util.OpinRankFiles;
 
+/**
+ * A class to type words in a document. Each word is sorted into one of four types:
+ * sentiment, product, facet, or none. This is the TermType enumeration. Use the
+ * provided methods of {@link #typeReviewWords(String)} or {@link #extractReviewFacets(String)}.
+ */
 public class TermTyper {
 	private SentimentAnalyzer analyzer;
 	private PartOfSpeechTagger tagger;
@@ -31,7 +37,7 @@ public class TermTyper {
 // Stemming in any form will reduce redundancies, but in the process it will create word stems
 // that are not fit for display.
 final boolean STEM = true;
-		Scanner scan = new Scanner(new File(OpinRankFiles.carFile+"2007" +File.separator+ "volvo_c70.txt"));
+		Scanner scan = new Scanner(new File(OpinRankFiles.carFile+"2007" +File.separator+ "chevrolet_impala.txt"));
 		CountedWords facets = new CountedWords();
 		int lineNo = 0;
 		while(scan.hasNextLine()) {
@@ -74,7 +80,16 @@ if(lineNo > 5000)
 		
 		System.out.println("Results: (" + facets.getDistinctSize() + ")");
 		//print the words out from most common to least common
-		Set<String> words = facets.getDistinctWords();
+		List<String> banned = Arrays.asList("car", "people", "vehicle");
+		if(STEM) {
+			for(int j=0; j<banned.size(); j++)
+				banned.set(j, stemmer.stem(banned.get(j)));
+		}
+		printResults(facets, false, banned);
+	}
+	
+	private static void printResults(CountedWords facets, boolean printAll, List<String> banned) {
+		Set<String> words = facets.getDistinct();
 		List<String> commonFacets = new ArrayList<>();
 		commonFacets.addAll(words);
 		//sort by their occurrences
@@ -86,16 +101,12 @@ if(lineNo > 5000)
 			String word = commonFacets.get(i);
 			//skip all that only have one occurrence
 			int occ = facets.getOccurrences(word);
-			if(occ == 1) {
-				System.out.println("... " + (commonFacets.size() - i) + " ommitted single-occurrence facets");
+			if(!printAll && occ == 1) {
+				System.out.println("... " + (commonFacets.size() - i) + " omitted single-occurrence facets");
 				break;
 			}
+			
 			//also we want to filter out a couple of subject-specific banned words
-			List<String> banned = Arrays.asList("car", "people");
-			if(STEM) {
-				for(int j=0; j<banned.size(); j++)
-					banned.set(j, stemmer.stem(banned.get(j)));
-			}
 			if(banned.contains(word.toLowerCase()))
 				continue;
 			System.out.println("  " + word + ": " + occ);
@@ -103,29 +114,65 @@ if(lineNo > 5000)
 		//System.out.println(facets);
 	}
 	
+	@SuppressWarnings("unused") //this is still in experimental development
+	private static void printGroupedResults(CountedWords facets, Depluralizer stemmer, boolean STEM, boolean printAll, List<String> banned) {
+		FacetGroups groups = new TermTyper.FacetGroups();
+		
+		for(String term: facets.getDistinct()) {
+			if(banned.contains(term))
+				continue;
+			groups.addFacet(term);
+		}
+		List<FacetGroups.Group> sorted = new ArrayList<>(groups.getGroupNames().size());
+		Collections.sort(sorted, (FacetGroups.Group o1, FacetGroups.Group o2) -> {
+			return Integer.compare(-o1.occurrences, -o2.occurrences); //sort descending
+		});
+		
+		for(FacetGroups.Group group: sorted) {
+			//TODO here
+			System.out.println(/*group.name +*/ "(" + group.occurrences + ") {");
+			for(String facet: group.facets)
+				System.out.println("    " + facet);
+			System.out.println("}");
+		}
+	}
+	
 	public TermTyper() {
 		analyzer = new SentimentAnalyzer(SentimentAnalyzer.path);
 		tagger = new StanfordTagger();
 	}
 	
-	public void typeFile(String fileIn, String fileOut) throws IOException {
-		Scanner scan = new Scanner(new File(fileIn));
-		FileWriter out = new FileWriter(new File(fileOut));
-		while(scan.hasNextLine()) {
-			String line = scan.nextLine();
-			List<Pair<String, TermType>> list = typeWords(line);
-			
-			for(Pair<String, TermType> pair: list) {
-				out.write(pair.first);
-				out.write('_');
-				out.write(pair.second.toString());
-				out.write(' ');
+	/**
+	 * Extracts the facet words from the doc using {@link #typeReviewWords(String)}.
+	 * @param doc the text in the document to be analyzed.
+	 * @return the facet words and number of occurrences for each.
+	 */
+	public CountedWords extractReviewFacets(String doc) {
+		List<Pair<String, TermType>> words = typeReviewWords(doc);
+		CountedWords facets = new CountedWords();
+		Depluralizer stemmer = new Depluralizer();
+		for(Pair<String, TermType> term: words) {
+			if(term.second == TermType.FACET) {
+				//right now, we could still get duplicate words. We should stem them, but
+				//still keep track of the original.
+				String normTerm = term.first.toLowerCase();
+				
+				if(true) { //always stem
+					//stem the last word (if any)
+					int lastBegin = normTerm.lastIndexOf(' ');
+					if(lastBegin == -1) { //no spaces
+						normTerm = stemmer.stem(normTerm);
+					}else {
+						//only stem the last word (since that is where plurals tend to reside)
+						String prefix = normTerm.substring(0, lastBegin);
+						normTerm = prefix + " " + stemmer.stem(normTerm.substring(lastBegin+1));
+					}
+				}
+				
+				facets.addWord(normTerm);
 			}
-			out.write('\n');
 		}
-		out.close();
-		scan.close();
-		System.out.println("Finished!");
+		return facets;
 	}
 	
 	public List<Pair<String, TermType>> typeReviewWords(String sentence) {
@@ -304,7 +351,10 @@ if(lineNo > 5000)
 	
 	protected List<Pair<String, TermType>> typedWords;
 	protected StringBuilder facet;
-	/** This is a generic method for typing any kind of sentence. */
+	/**This is a generic method for typing any kind of sentence. This was used for the
+	 * Amazon dataset. Do NOT use for the OpinRank dataset. Use {@link #typeReviewWords(String)}
+	 * or {@link #extractReviewFacets(String)} instead.
+	 */
 	public List<Pair<String, TermType>> typeWords(String sentence) {
 		DataCleaner cleaner = new DataCleaner();
 		
@@ -466,6 +516,61 @@ if(lineNo > 5000)
 			facet.setLength(0); //clear out the old phrase
 		}
 		typedWords.add(new Pair<>(word, type));
+	}
+	
+	protected static class FacetGroups {
+		protected HashMap<String, Group> map;
+		
+		public void addFacet(String facet) {
+			//We try to match this facet to all current groups
+			//We break apart all the component words in the facet
+			String[] words = facet.split(" ");
+			//now we want to depluralize each term
+			Depluralizer stemmer = new Depluralizer();
+			for(int i=0; i<words.length; i++) {
+				words[i] = stemmer.stem(words[i]);
+			}
+			
+			for(String group: map.keySet()) {
+				//now we try to match for each facet in the group
+				//TODO I need to fix this so I match for single words (or maybe more)
+				//and create groups with group names that represent what is in common
+				Group groupPair = map.get(group);
+				for(String groupFacet: groupPair.facets) {
+					for(String word: words) {
+						if(groupFacet.contains(word)) {
+							// We found a match!
+							groupPair.facets.add(facet);
+							groupPair.occurrences++;
+							return;
+						}
+					}
+				}
+			}
+			
+			//If we made it here, the facet fits no groups.
+			//We create a new group for it, and the group takes its name. Therefore,
+			// the group name is not necessarily representative of the group identity
+			map.put(facet, new Group(facet));
+		}
+		
+		public Set<String> getGroupNames() {
+			return map.keySet();
+		}
+		
+		public Group getGroup(String groupName) {
+			return map.get(groupName);
+		}
+		
+		public class Group {
+			int occurrences = 0;
+			Set<String> facets = new HashSet<>();
+			
+			public Group() {}
+			public Group(String facet) {
+				facets.add(facet);
+			}
+		}
 	}
 
 }

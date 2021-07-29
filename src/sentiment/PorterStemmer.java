@@ -41,7 +41,7 @@ public class PorterStemmer {
         return str;
     } // end stem
 
-    protected String step1a (String str) {
+    private String step1a (String str) {
         // SSES -> SS
         if (str.endsWith("sses")) {
             return str.substring(0, str.length() - 2);

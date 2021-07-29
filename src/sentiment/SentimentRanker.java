@@ -285,7 +285,7 @@ for(int i=0; i<rankedReviews.size(); i++) {
 		//This is where we actually calculate score
 		private double findScore(int[] docsContain, String[] queryStems, Document[] documents) {
 			int maxFreq = 0;
-			for(String word: getCountedWords().getDistinctWords()) {
+			for(String word: getCountedWords().getDistinct()) {
 				int occurences = getCountedWords().getOccurrences(word);
 				if(occurences > maxFreq)
 					maxFreq = occurences;
@@ -368,7 +368,7 @@ for(int i=0; i<rankedReviews.size(); i++) {
 			// --Document similarity by tf.idf--
 			//In preparation, we need to find how many sentences contain each word
 			ArrayList<String> docStemsList = new ArrayList<>();
-			docStemsList.addAll(getCountedWords().getDistinctWords());
+			docStemsList.addAll(getCountedWords().getDistinct());
 			String[] docStems = new String[docStemsList.size()];
 			docStems = docStemsList.toArray(docStems);
 			
@@ -421,7 +421,7 @@ for(int i=0; i<rankedReviews.size(); i++) {
 		
 		private void identifySignificantWords() {
 			//now we can go through each term in the doc and identify if it is significant
-			for(String word: forAllDoc.getDistinctWords()) {
+			for(String word: forAllDoc.getDistinct()) {
 				boolean significant = false;
 				if(sentences.length < 25) {
 					significant = forAllDoc.getOccurrences(word) >= 7 - 0.1*(25 - sentences.length);
@@ -602,7 +602,7 @@ for(int i=0; i<rankedReviews.size(); i++) {
 			} //otherwise, we assume that it was populated for us
 			
 			int maxFreq = 0;
-			for(String word: countedWords.getDistinctWords()) {
+			for(String word: countedWords.getDistinct()) {
 				int occurences = countedWords.getOccurrences(word);
 				if(occurences > maxFreq)
 					maxFreq = occurences;
