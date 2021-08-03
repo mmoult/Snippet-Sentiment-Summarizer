@@ -85,7 +85,7 @@ if(lineNo > 5000)
 			for(int j=0; j<banned.size(); j++)
 				banned.set(j, stemmer.stem(banned.get(j)));
 		}
-		printResults(facets, false, banned);
+		printResults(facets, true, banned);
 	}
 	
 	private static void printResults(CountedWords facets, boolean printAll, List<String> banned) {
@@ -261,9 +261,11 @@ if(lineNo > 5000)
 			// verb: what does the {power steering switch} do
 			// preposition: where is a {good place} in Salt Lake City.
 			// conjunction: one ride in the {fast mercedes} and we were hooked 
+			// wh_interog: it is the {car} that/which I love the most.
 			//then the after article object phrase has ended
 			if(objectPhrase &&
-					(pos == PartOfSpeech.VERB || pos == PartOfSpeech.PREP || pos == PartOfSpeech.CONJ)) {
+					(pos == PartOfSpeech.VERB || pos == PartOfSpeech.PREP || pos == PartOfSpeech.CONJ ||
+					pos == PartOfSpeech.WH_INTEROG)) {
 				objectPhrase = false;
 				//flush if any
 				if(object.length() > 0) {

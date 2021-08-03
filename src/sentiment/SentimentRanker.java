@@ -15,21 +15,30 @@ import classifying.CountedWords;
 import coreference.CoreferenceResolver;
 import parsing.DataCleaner;
 import util.AsinBridge;
+import util.OpinRankFiles;
 import util.AmazonFileResources;
 
 public class SentimentRanker {
 	protected SentimentAnalyzer analyzer;
 	
 	public static void main(String args[]) throws IOException {
-		final String QUERY = "folding clothing dryer";
+		final String QUERY = "honda odyssey 2007 mpg no problems";
 		
 		SentimentRanker ranker = new SentimentRanker();
 		List<String> goodWords = cleanQuery(QUERY);
-		Classifier classifer = new Classifier(false);
-		int file = classifer.classify(goodWords);
-		System.out.println("Searching in " + AmazonFileResources.metaFiles[file] + " for \"" + QUERY + "\".");
-		List<Document> result = ranker.rankDocRelevance(goodWords, 100, 784, file);
-		//evaluate here how good the document retrieval was
+		
+		//TODO here we would classify to find if the query describes a car or hotel.
+		// For now, we are just assuming a type of car.
+		//Classifier classifer = new Classifier(false);
+		//int file = classifer.classify(goodWords);
+		
+		//TODO Here we would try to choose which car is to be processed. We could limit the search
+		// based on any year given in the query and any names.
+		// For now, we are just going to assume that the car is the 2007 Honda Odyssey.
+		//System.out.println("Searching in " + AmazonFileResources.metaFiles[file] + " for \"" + QUERY + "\".");
+		List<Document> rankedReviews = ranker.rankDocRelevance(goodWords, 100, -1,
+				OpinRankFiles.carFile+"2007"+File.separator+"honda_odyssey.txt");
+/*evaluate here how good the document retrieval was
 System.out.println("PRODUCTS RETRIEVED (" + result.size()+")=");
 //FileWriter temp = new FileWriter("out.txt");
 int iii=0;
@@ -39,9 +48,10 @@ for(Document doc: result) {
 }
 System.exit(0);
 //temp.close();
+*/
 
-		System.out.println("Retrieving reviews...");
-		//Now we want to get the product reviews associated with the ranked documents
+		//System.out.println("Retrieving reviews...");
+		/*Now we want to get the product reviews associated with the ranked documents
 		List<String> reviews = new ArrayList<>();
 		PorterStemmer stemmer = new PorterStemmer();
 		AsinBridge bridge = new AsinBridge(file, stemmer);
@@ -49,8 +59,9 @@ System.exit(0);
 			reviews.addAll(bridge.getReviewsByAsin(doc.getAsin()));
 		
 		//we also want to rank the reviews by document score
+		 */
 		System.out.println("Ranking reviews");
-		List<Document> rankedReviews = ranker.rankDocRelevance(goodWords, 100, reviews);
+		//List<Document> rankedReviews = ranker.rankDocRelevance(goodWords, 100, -1, reviews);
 		
 		System.out.println("REVIEWS RETRIEVED (" + rankedReviews.size() + ")=");
 
@@ -68,6 +79,14 @@ System.exit(0);
 			done++;
 			System.out.print("Resolving coreferences: "+ ((done*100)/rankedReviews.size())+"%  \r");
 		}
+
+int iii=0;
+for(Document doc: rankedReviews) {
+	//temp.write(doc.toString() + '\n');
+	System.out.println("[" + (++iii) + "] " + doc.getText());
+}
+System.exit(0);
+
 		System.out.println();
 		List<Sentence> rankedSentences = new ArrayList<>();
 		int sumWords = 0;
@@ -86,6 +105,7 @@ for(int i=0; i<HOW_MANY_SENTENCES; i++) {
 	System.out.println("["+s.getSignificance() +"] " + s);
 }*/
 		//We want to build a summary that is about 10% of all the words gotten
+System.exit(0);
 		System.out.println("Building summary...");
 		StringBuilder summary = new StringBuilder();
 		int summarySize = 0;
@@ -159,7 +179,7 @@ for(int i=0; i<rankedReviews.size(); i++) {
 	public List<Document> rankDocRelevance(String query, int topHowMany, int toSearch, int file)
 			throws FileNotFoundException {
 		List<String> goodWords = cleanQuery(query);
-		return rankDocRelevance(goodWords, topHowMany, toSearch, file);
+		return null; //rankDocRelevance(goodWords, topHowMany, toSearch, file);
 	}
 	/**
 	 * Ranks the documents found at the given file location and returns the relevant documents
@@ -175,11 +195,13 @@ for(int i=0; i<rankedReviews.size(); i++) {
 	 * to the query. Sorted by descending relevance.
 	 * @throws FileNotFoundException If the metafile read from cannot be found
 	 */
-	public List<Document> rankDocRelevance(List<String> query, int topHowMany, int toSearch, int file) 
+	public List<Document> rankDocRelevance(List<String> query, int topHowMany, int toSearch, /*int file*/ String file) 
 			throws FileNotFoundException {
-		List<String> lines = new ArrayList<>(toSearch);
-		Scanner scan = new Scanner(new File(AmazonFileResources.metaFiles[file]));
-		for(int j=0; j<toSearch; j++) {
+		
+		List<String> lines = new ArrayList<>(toSearch!=-1 ? toSearch: topHowMany);
+		//Scanner scan = new Scanner(new File(AmazonFileResources.metaFiles[file]));
+		Scanner scan = new Scanner(new File(file));
+		for(int j=0; j<toSearch || toSearch==-1; j++) {
 			if(scan.hasNextLine()) {
 				String line = scan.nextLine();
 				int wordsStart = line.indexOf("\"words\": ");
@@ -404,7 +426,7 @@ for(int i=0; i<rankedReviews.size(); i++) {
 			for(Sentence sentence: sentences)
 				sentence.similarityVal = (sentence.similarityVal - minScore) / (maxScore - minScore);
 			
-			// Lastly, compute the certainty factor for each sentence
+			// Lastly, compute the Stanford certainty factor for each sentence
 			for(Sentence sentence: sentences) {
 				double min = Math.min(Math.min(sentence.significance, sentence.sentimentWeight),
 						sentence.similarityVal);

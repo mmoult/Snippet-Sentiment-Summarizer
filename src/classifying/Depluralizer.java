@@ -14,6 +14,9 @@ public class Depluralizer {
         else if (str.endsWith("ies")) 
         	return str.substring(0, str.length() - 3)  + 'y';
 		
+        else if (str.endsWith("ches"))
+        	return str.substring(0, str.length() - 2);
+		
 		//If the word ends in -oes, we have about a 50-50 guess at whether the final
 		// e should be kept or not. ex: tornadoes vs toes
         else if (str.endsWith("oes"))
@@ -22,8 +25,14 @@ public class Depluralizer {
         else if (str.endsWith("es"))
         	return str.substring(0, str.length() - 1);
 		
-        else if (str.endsWith("s") && !isVowel(str.charAt(str.length()-2)))
-        	return str.substring(0, str.length() - 1);
+        else if(str.endsWith("sses"))
+        	return str.substring(0, str.length() - 2);
+		
+        else if (str.endsWith("s") && str.length() > 1) {
+        	char c = str.charAt(str.length() - 2);
+        	if(Character.isLetterOrDigit(c) && !isVowel(str.charAt(str.length()-2)) && c != 's')
+        		return str.substring(0, str.length() - 1);
+        }
         
 		//otherwise, do nothing
         return str;

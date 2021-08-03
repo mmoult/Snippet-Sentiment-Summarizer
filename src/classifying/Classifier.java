@@ -168,7 +168,7 @@ public class Classifier {
 			double pDofC = 1;
 			// P(w|c) = [tfw,c + 1] / [|c| + |V|]
 			CountedWords clazz = classes.get(j);
-			for(String word: document.getDistinctWords()) {
+			for(String word: document.getDistinct()) {
 				//Laplacian smoothed here
 				double base = (clazz.getOccurrences(word) + 1d) /
 						//(clazz.getSize() + clazz.getDistinctSize()); //TRUE
