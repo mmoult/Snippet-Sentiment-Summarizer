@@ -14,30 +14,29 @@ import classifying.Classifier;
 import classifying.CountedWords;
 import coreference.CoreferenceResolver;
 import parsing.DataCleaner;
-import util.AsinBridge;
-import util.OpinRankFiles;
 import util.AmazonFileResources;
+import util.OpinRankFiles;
 
 public class SentimentRanker {
 	protected SentimentAnalyzer analyzer;
 	
 	public static void main(String args[]) throws IOException {
-		final String QUERY = "honda odyssey 2007 mpg no problems";
+		final String QUERY = "car with good brakes and steering";
 		
 		SentimentRanker ranker = new SentimentRanker();
 		List<String> goodWords = cleanQuery(QUERY);
 		
-		//TODO here we would classify to find if the query describes a car or hotel.
-		// For now, we are just assuming a type of car.
-		//Classifier classifer = new Classifier(false);
-		//int file = classifer.classify(goodWords);
+		// Here we would classify to find which car is being described by the query
+		char sep = File.separatorChar;
+		String searchPath = OpinRankFiles.carFile+ sep + "2009" + sep;
+		Classifier classifier = new Classifier(false, searchPath);
+		String path = classifier.classify(goodWords);
 		
 		//TODO Here we would try to choose which car is to be processed. We could limit the search
 		// based on any year given in the query and any names.
 		// For now, we are just going to assume that the car is the 2007 Honda Odyssey.
-		//System.out.println("Searching in " + AmazonFileResources.metaFiles[file] + " for \"" + QUERY + "\".");
-		List<Document> rankedReviews = ranker.rankDocRelevance(goodWords, 100, -1,
-				OpinRankFiles.carFile+"2007"+File.separator+"honda_odyssey.txt");
+		System.out.println("Searching in " + path + " for \"" + QUERY + "\".");
+		List<Document> rankedReviews = ranker.rankDocRelevance(goodWords, 100, -1, path);
 /*evaluate here how good the document retrieval was
 System.out.println("PRODUCTS RETRIEVED (" + result.size()+")=");
 //FileWriter temp = new FileWriter("out.txt");
@@ -169,18 +168,12 @@ for(int i=0; i<rankedReviews.size(); i++) {
 		//analyzer.convertToStemmed();
 	}
 	
-	
 	private static List<String> cleanQuery(String query) {
 		DataCleaner cleaner = new DataCleaner();
 		String cleaned = DataCleaner.removePunctuation(query, false);
 		return cleaner.filterStopWords(cleaned);
 	}
 	
-	public List<Document> rankDocRelevance(String query, int topHowMany, int toSearch, int file)
-			throws FileNotFoundException {
-		List<String> goodWords = cleanQuery(query);
-		return null; //rankDocRelevance(goodWords, topHowMany, toSearch, file);
-	}
 	/**
 	 * Ranks the documents found at the given file location and returns the relevant documents
 	 * sorted in descending relevance order. 
