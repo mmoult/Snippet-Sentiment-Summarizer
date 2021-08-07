@@ -195,7 +195,7 @@ public class DataCleaner {
 		return set.toString();
 	}
 	
-	public List<String> filterStopWords(String wordList) {
+	public List<String> filterStopWords(String wordList, boolean filterNumbers) {
 		if(stopWords == null) {
 			try {
 				stopWords = getStopWords();
@@ -216,11 +216,13 @@ public class DataCleaner {
 				continue;
 			
 			//filter all numbers
-			try {
-				Integer.parseInt(token);
-				continue;
-			}catch(NumberFormatException e) {
-				//keep going and add this non-number token
+			if(filterNumbers) {
+				try {
+					Integer.parseInt(token);
+					continue;
+				}catch(NumberFormatException e) {
+					//keep going and add this non-number token
+				}
 			}
 			
 			if(!stopWords.contains(token)) {

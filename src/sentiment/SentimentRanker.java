@@ -6,14 +6,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
-import java.util.regex.Pattern;
+import java.util.Set;
+import java.util.Stack;
 
 import classifying.Classifier;
-import classifying.CountedWords;
 import coreference.CoreferenceResolver;
 import parsing.DataCleaner;
+import sentiment.Document.Sentence;
 import util.AmazonFileResources;
 import util.OpinRankFiles;
 
@@ -21,21 +23,92 @@ public class SentimentRanker {
 	protected SentimentAnalyzer analyzer;
 	
 	public static void main(String args[]) throws IOException {
-		final String QUERY = "car with good brakes and steering";
+		final String QUERY = "2006 honda with good steering and brakes";
 		
 		SentimentRanker ranker = new SentimentRanker();
 		List<String> goodWords = cleanQuery(QUERY);
 		
-		// Here we would classify to find which car is being described by the query
+		// Here we would classify to find whether car or hotel is being described by the query
 		char sep = File.separatorChar;
-		String searchPath = OpinRankFiles.carFile+ sep + "2009" + sep;
-		Classifier classifier = new Classifier(false, searchPath);
+		String searchPath = OpinRankFiles.root + sep;
+		// For the sake of time, we will blacklist some folders.
+		List<String> blackList = Arrays.asList("2007", "2009", "beijing", "dubai", "london", "montreal", "new-delhi", "shanghai");
+		Classifier classifier = new Classifier(false, searchPath, blackList);
 		String path = classifier.classify(goodWords);
 		
-		//TODO Here we would try to choose which car is to be processed. We could limit the search
-		// based on any year given in the query and any names.
-		// For now, we are just going to assume that the car is the 2007 Honda Odyssey.
+		//Here we would try to choose which car is to be processed. We will find all all
+		// files in the directory that was classified (car or hotel). Then we will match
+		// the query to the file names. Since file names will likely be insufficient to
+		// limit to one product, we will perform tf.idf relevance on those that remain
+		List<File> relevants = new ArrayList<>();
+		Stack<File> toSearch = new Stack<>();
+		toSearch.add(new File(path));
+		
+		//We will keep track of all words matched in the file directory. We don't want
+		// them to be used again in the tf.idf measure, and the words in the file
+		// directory tend to be product terms that shouldn't be used, regardless.
+		Set<String> usedWords = new HashSet<>();
+		
+		while(!toSearch.isEmpty()) {
+			File analyze = toSearch.pop();
+//TODO do I want to black list any files in the search?
+//if(blackList.contains(analyze.getName()))
+//	continue; //skip names matching the blacklist
+			
+			if(analyze.isFile() && analyze.getName().endsWith(".txt"))
+				relevants.add(analyze);
+			else if(analyze.isDirectory()) {
+				File[] subs = analyze.listFiles();
+				List<File> mostRelevant = new ArrayList<>();
+				int relevantMax = 0; //if none are found to be "relevant", add all
+				//However, if one is found to be relevant, ignore all that aren't
+				for(File sub: subs) {
+					if(sub.isFile() && !sub.getName().endsWith(".txt"))
+						continue;
+					
+					int relevant = 0;
+					String[] words = sub.getName().split("[-_.\\s]");
+					for(String word: words) {
+						if(containsIgnoreCase(goodWords, word)) {
+							relevant++;
+							usedWords.add(word);
+						}
+					}
+					if(relevant >= relevantMax) {
+						if(relevant > relevantMax)
+							mostRelevant.clear();
+						mostRelevant.add(sub);
+						relevantMax = relevant;
+					}
+				}
+				
+				for(File sub: mostRelevant)
+					toSearch.push(sub);
+			}
+		}
+		//Now we have a list of potential matches called "relevants".
+		//But we only want to have one product to search reviews for.
+		if(relevants.size() < 1) {
+			System.err.println("No document matched the query!");
+			return;
+		}else if(relevants.size() == 1)
+			path = relevants.get(0).getPath();
+		else { //We must do some pruning with the content of the files (by tf.idf)
+			//We want to remove all terms from the query that were used in the file directory.
+			//However, just to be safe, we only want to remove words from the query when
+			// processing files that actually used said terms.
+			List<String> termsRemaining = new ArrayList<>();
+			termsRemaining.addAll(goodWords);
+			for(String word: usedWords)
+				termsRemaining.remove(word);
+			
+			List<Document> files = ranker.rankFileRelevance(termsRemaining, 1, -1, relevants);
+			path = files.get(0).getId();
+		}
+
+		//Now that we have the query-relevant product, we find the most relevant reviews
 		System.out.println("Searching in " + path + " for \"" + QUERY + "\".");
+		//TODO I am not sure if I should use "goodWords" here or "termsRemaining"
 		List<Document> rankedReviews = ranker.rankDocRelevance(goodWords, 100, -1, path);
 /*evaluate here how good the document retrieval was
 System.out.println("PRODUCTS RETRIEVED (" + result.size()+")=");
@@ -112,7 +185,7 @@ System.exit(0);
 			if(summarySize * 10 >= sumWords)
 				break; //the summary is long enough
 			
-			summarySize += rankedSentences.get(i).words.length;
+			summarySize += rankedSentences.get(i).getWords().length;
 			if(i > 0)
 				summary.append(". ");
 //append some info about the doc the sentence came from
@@ -131,6 +204,14 @@ System.out.println("Documents=");
 for(int i=0; i<rankedReviews.size(); i++) {
 	System.out.println("[" + i + "] " + rankedReviews.get(i).getText());
 }
+	}
+	
+	private static boolean containsIgnoreCase(List<String> ls, String test) {
+		for(String it: ls) {
+			if(it.equalsIgnoreCase(test))
+				return true;
+		}
+		return false;
 	}
 	
 	private static boolean isQueryPosSentiment(List<String> query, SentimentAnalyzer analyzer) {
@@ -171,7 +252,7 @@ for(int i=0; i<rankedReviews.size(); i++) {
 	private static List<String> cleanQuery(String query) {
 		DataCleaner cleaner = new DataCleaner();
 		String cleaned = DataCleaner.removePunctuation(query, false);
-		return cleaner.filterStopWords(cleaned);
+		return cleaner.filterStopWords(cleaned, false);
 	}
 	
 	/**
@@ -186,12 +267,13 @@ for(int i=0; i<rankedReviews.size(); i++) {
 	 * @param file the file index in {@link AmazonFileResources}.
 	 * @return a list of at most <code>topHowMany</code> documents that were found to be relevant
 	 * to the query. Sorted by descending relevance.
-	 * @throws FileNotFoundException If the metafile read from cannot be found
+	 * @throws FileNotFoundException If the file to read from cannot be found
 	 */
 	public List<Document> rankDocRelevance(List<String> query, int topHowMany, int toSearch, /*int file*/ String file) 
 			throws FileNotFoundException {
 		
-		List<String> lines = new ArrayList<>(toSearch!=-1 ? toSearch: topHowMany);
+		PorterStemmer stemmer = new PorterStemmer();
+		List<Document> documents = new ArrayList<>(toSearch!=-1 ? toSearch: topHowMany);
 		//Scanner scan = new Scanner(new File(AmazonFileResources.metaFiles[file]));
 		Scanner scan = new Scanner(new File(file));
 		for(int j=0; j<toSearch || toSearch==-1; j++) {
@@ -202,38 +284,58 @@ for(int i=0; i<rankedReviews.size(); i++) {
 					j--; //don't count this line as an entry added
 					continue;
 				}
-				lines.add(line);
+				String asin = DataCleaner.getStringField(line, "asin", false);
+				
+				String words = line.substring(wordsStart + 9);
+				words = words.substring(0, words.length());
+				
+				documents.add(new Document(words, stemmer, asin));
 			}else //in case more lines are to be searched than exist
 				break;
 		}
 		scan.close();
 		
-		return rankDocRelevance(query, topHowMany, lines);
+		return rankDocRelevance(query, topHowMany, documents, stemmer);
 	}
-	public List<Document> rankDocRelevance(List<String> query, int topHowMany, List<String> docs) {
+	public List<Document> rankFileRelevance(List<String> query, int topHowMany, int toSearch, List<File> files) 
+			throws FileNotFoundException {
 		PorterStemmer stemmer = new PorterStemmer();
+		List<Document> documents = new ArrayList<>(toSearch!=-1 ? toSearch: topHowMany);
 		
-		String[] queryStems = new String[query.size()];
-		for(int i=0; i<query.size(); i++) {
-			queryStems[i] = stemmer.stem(query.get(i));
+		for(File file: files) {
+			Scanner scan = new Scanner(file);
+			
+			StringBuilder allWords = new StringBuilder();
+			for(int j=0; j<toSearch || toSearch==-1; j++) {
+				if(scan.hasNextLine()) {
+					String line = scan.nextLine();
+					int wordsStart = line.indexOf("\"words\": ");
+					if(wordsStart == -1) {//occurs for empty lines or intro lines
+						j--; //don't count this line as an entry added
+						continue;
+					}
+					
+					String words = line.substring(wordsStart + 9);
+					words = words.substring(0, words.length());
+					allWords.append(words);
+				}else //in case more lines are to be searched than exist
+					break;
+			}
+			scan.close();
+			documents.add(new Document(allWords.toString(), stemmer, file.getPath()));
 		}
 		
-		//load the metadata file so that we can properly find the correct products
-		Document[] documents = new Document[docs.size()];
-		
-		for(int j=0; j<docs.size(); j++) {
-			String line = docs.get(j);
-			int wordsStart = line.indexOf("\"words\": ");
-			if(wordsStart == -1) {//occurs for empty lines or intro lines
-				j--; //don't count this line as an entry added
-				continue;
-			}
-			String asin = DataCleaner.getStringField(line, "asin", false);
-			
-			String words = line.substring(wordsStart + 9);
-			words = words.substring(0, words.length());
-			
-			documents[j] = new Document(words, stemmer, asin);
+		return rankDocRelevance(query, topHowMany, documents, stemmer);
+	}
+	
+	public List<Document> rankDocRelevance(List<String> query, int topHowMany, List<Document> documents, PorterStemmer stemmer) {		
+		String[] queryStems = new String[query.size()];
+		for(int i=0; i<query.size(); i++) {
+			String stemmed = stemmer.stem(query.get(i));
+			if(stemmed.isEmpty())
+				queryStems[i] = query.get(i);
+			else
+				queryStems[i] = stemmed;
 		}
 		
 		//now we need to choose the top ones
@@ -248,7 +350,7 @@ for(int i=0; i<rankedReviews.size(); i++) {
 		//And we can compute score as:
 		//SCORE(q,d) = Sum for t in q (TF(t,d) * IDF(t))
 		
-		//as a preliminary measure, find the number of documents that contain each query word
+		//as a preliminary measure for tf.idf, find the number of documents that contain each query word
 		int[] docsContain = new int[queryStems.length];
 		for(int i=0; i<queryStems.length; i++) {
 			for(Document doc: documents) {
@@ -258,411 +360,28 @@ for(int i=0; i<rankedReviews.size(); i++) {
 		}
 		
 		//sort by the score (as defined by a anonymous inner class comparator)
-		List<Document> sorted = Arrays.asList(documents);
-		sorted.sort(new Comparator<Document>() {
+		int numDocs = documents.size();
+		documents.sort(new Comparator<Document>() {
 			@Override
 			public int compare(Document o1, Document o2) {
 				//Reverse the order since we want to sort descending
-				return Double.compare(o2.findScore(docsContain, queryStems, documents),
-						o1.findScore(docsContain, queryStems, documents));
+				return Double.compare(o2.findScore(docsContain, queryStems, numDocs),
+						o1.findScore(docsContain, queryStems, numDocs));
 			}
 		});
 		
-		//great, now we found the most likely products. We want to use this information
-		//to get the reviews for the products that we found
+		//great, now we found the most likely documents.
 		List<Document> relevant = null;
-		for(int i=0; i<sorted.size(); i++) {
+		for(int i=0; i<documents.size(); i++) {
 			if(i >= topHowMany || 
-					sorted.get(i).findScore(docsContain, queryStems, documents) <= 0) {
-				relevant = sorted.subList(0, i);
+					documents.get(i).findScore(docsContain, queryStems, numDocs) <= 0) {
+				relevant = documents.subList(0, i);
 				break;
 			}
 		}
 		if(relevant == null)
 			relevant = new ArrayList<>();
 		return relevant;
-	}
-	
-	public static class Document {
-		private Sentence[] sentences;
-		private List<String> sigWords;
-		private CountedWords forAllDoc;
-		private String asin;
-		private PorterStemmer stemmer;
-		
-		public Document(String document, PorterStemmer stemmer, String asin) {
-			this.asin = asin;
-			this.stemmer = stemmer;
-			
-			setText(document);
-		}
-		
-		//This is where we actually calculate score
-		private double findScore(int[] docsContain, String[] queryStems, Document[] documents) {
-			int maxFreq = 0;
-			for(String word: getCountedWords().getDistinct()) {
-				int occurences = getCountedWords().getOccurrences(word);
-				if(occurences > maxFreq)
-					maxFreq = occurences;
-			}
-			
-			double sum = 0;
-			for(int i=0; i<queryStems.length; i++) {
-				if(docsContain[i] == 0) //this gives us divide by zero error
-					//also doesn't make sense to factor occurrences into the score if no document has the word
-					continue;
-				
-				double tf = getCountedWords().getOccurrences(queryStems[i]) / (double)maxFreq;
-				double idf = Math.log(documents.length / (double)docsContain[i])/ Math.log(2);
-				sum += tf*idf;
-			}
-			
-			if(Double.isNaN(sum))
-				return 0;
-			return sum;
-		}
-		
-		public List<Sentence> identifySignificantSentences(SentimentAnalyzer analyzer, boolean posSentiment) {
-			identifySignificantWords();
-			
-			// --Regular significance factor--
-			double maxSig = Double.NEGATIVE_INFINITY;
-			double minSig = Double.POSITIVE_INFINITY;
-			//now determine significance for each of my sentences
-			for(Sentence sentence: sentences) {
-				int numSigWords = 0;
-				for(String sigWord: sigWords) {
-					numSigWords += sentence.contains(sigWord);
-				}
-				double significance = (Math.pow(numSigWords, 2) / (double)sentence.size());
-				sentence.setSignificance(significance);
-				if(significance < minSig)
-					minSig = significance;
-				if(significance > maxSig)
-					maxSig = significance;
-			}
-			//normalize significance values
-			for(Sentence sentence: sentences)
-				sentence.setSignificance((sentence.getSignificance() - minSig) / (maxSig - minSig));
-			
-			// --Sentiment weight value--
-			double docMin = Double.POSITIVE_INFINITY;
-			double docMax = Double.NEGATIVE_INFINITY;
-			for(Sentence sentence: sentences) {
-				double sumSentiment = 0;
-				for(String word: sentence.words) {
-					List<Sentiment> sentiments = analyzer.querySentiment(word.toLowerCase());
-					//we can get several sentiment results back for one word. Right now we won't try to
-					//find which one is really true, we will just find the average of all returned
-					if(sentiments != null) {
-						double value = 0;
-						int numSents = 0;
-						for(Sentiment sent: sentiments) {
-							//a sentiment will only be null if the file is corrupted 
-							//(which is true since we trimmed the non-sentiment words).
-							if(sent != null) {
-								numSents++;
-								value += sent.getScore().getPositive() - sent.getScore().getNegative();
-							}
-						}		
-						sumSentiment += (posSentiment? 1:-1) * value / numSents;
-					}
-				}
-				//We don't weight for sentence length since longer sentences are generally
-				//more descriptive, which we would like in this instance.
-				sentence.sentimentWeight = sumSentiment;
-				if(sentence.sentimentWeight > docMax)
-					docMax = sentence.sentimentWeight;
-				if(sentence.sentimentWeight < docMin)
-					docMin = sentence.sentimentWeight;
-			}
-			//normalize the values
-			for(Sentence sentence: sentences) 
-				sentence.sentimentWeight = (sentence.sentimentWeight - docMin) / (docMax - docMin);
-			
-			// --Document similarity by tf.idf--
-			//In preparation, we need to find how many sentences contain each word
-			ArrayList<String> docStemsList = new ArrayList<>();
-			docStemsList.addAll(getCountedWords().getDistinct());
-			String[] docStems = new String[docStemsList.size()];
-			docStems = docStemsList.toArray(docStems);
-			
-			int[] sentsContain = new int[docStems.length];
-			CountedWords[] counted = new CountedWords[sentences.length];
-			for(int j=0; j<sentences.length; j++) { //populate counted words for each sentence
-				counted[j] = new CountedWords();
-				for(String word: sentences[j].words) {
-					counted[j].addWord(word);
-				}
-			}
-			for(int i=0; i<docStems.length; i++) {
-				String docStem = docStems[i];
-				sentsContain[i] = 0;
-				for(int j=0; j<sentences.length; j++) {
-					if(counted[j].getOccurrences(docStem) > 0)
-						sentsContain[i]++;
-				}
-			}
-			
-			double minScore = Double.POSITIVE_INFINITY;
-			double maxScore = Double.NEGATIVE_INFINITY;
-			for(int i=0; i<sentences.length; i++) {
-				Sentence sentence = sentences[i];
-				
-				sentence.findScore(sentsContain, docStems, sentences.length, counted[i]);
-				if(sentence.similarityVal > maxScore)
-					maxScore = sentence.similarityVal;
-				if(sentence.similarityVal < minScore)
-					minScore = sentence.similarityVal;
-			}
-			//go back through and normalize all
-			for(Sentence sentence: sentences)
-				sentence.similarityVal = (sentence.similarityVal - minScore) / (maxScore - minScore);
-			
-			// Lastly, compute the Stanford certainty factor for each sentence
-			for(Sentence sentence: sentences) {
-				double min = Math.min(Math.min(sentence.significance, sentence.sentimentWeight),
-						sentence.similarityVal);
-				sentence.certaintyFactor =
-						(sentence.significance + sentence.sentimentWeight + sentence.similarityVal) / (1 - min);
-			}
-			
-			//now sort all the sentences and return the result
-			Sentence[] ranked = sentences.clone();
-			List<Sentence> rankedList = Arrays.asList(ranked);
-			rankedList.sort(Sentence.sigComparator); //Sentence.certaintyComparator
-			return rankedList;
-		}
-		
-		private void identifySignificantWords() {
-			//now we can go through each term in the doc and identify if it is significant
-			for(String word: forAllDoc.getDistinct()) {
-				boolean significant = false;
-				if(sentences.length < 25) {
-					significant = forAllDoc.getOccurrences(word) >= 7 - 0.1*(25 - sentences.length);
-				}else if(sentences.length <= 40) {
-					significant = forAllDoc.getOccurrences(word) >= 7;
-				}else {
-					significant = forAllDoc.getOccurrences(word) >= 7 + 0.1*(40 - sentences.length);
-				}
-				if(significant) {
-					sigWords.add(word);
-				}
-			}
-		}
-		
-		public int numOfWords() {
-			int sum = 0;
-			for(Sentence sentence: sentences) {
-				sum += sentence.size();
-			}
-			return sum;
-		}
-		
-		public int size() {
-			return sentences.length;
-		}
-		
-		public Sentence[] getSentences() {
-			return sentences;
-		}
-		
-		public List<String> getSignificantWords() {
-			return sigWords;
-		}
-		public CountedWords getCountedWords() {
-			return forAllDoc;
-		}
-		
-		public String getAsin() {
-			return asin;
-		}
-		
-		public String getText() {
-			StringBuilder toReturn = new StringBuilder();
-			boolean first = true;
-			for(Sentence sentence: sentences) {
-				if(!first)
-					toReturn.append(" | ");
-				else
-					first = false;
-				toReturn.append(sentence.originalText);
-			}
-			return toReturn.toString();
-		}
-		
-		public void setText(String newText) {
-			String[] sents = newText.split(Pattern.quote("|"));
-			//If the last "sentence" is blank, then it just means that the author
-			//used good grammar and ended with a period
-			int size = sents.length;
-			if(sents[size-1].trim().isEmpty())
-				size--;
-			
-			sentences = new Sentence[size];
-			for(int i=0; i<size; i++) {
-				sentences[i] = new Sentence(this, sents[i], stemmer);
-			}
-			
-			sigWords = new ArrayList<>();
-			forAllDoc = new CountedWords();
-			for(Sentence sentence: sentences) {
-				for(String word: sentence.words) {
-					forAllDoc.addWord(word);
-				}
-			}
-		}
-		
-		@Override
-		public String toString() {
-			StringBuilder out = new StringBuilder();
-			out.append("Document (" + asin + "): {\n");
-			for(Sentence sentence: sentences) {
-				out.append("  ");
-				out.append(sentence);
-				out.append('\n');
-			}
-			out.append("}");
-			return out.toString();
-		}
-
-		@Override
-		public int hashCode() {
-			return asin.hashCode() + sentences.length;
-		}
-		
-	}
-	
-	public static class Sentence {
-		private String originalText;
-		private String[] words;
-		private Document source;
-		
-		private double significance;
-		private double sentimentWeight;
-		private double similarityVal;
-		private double certaintyFactor;
-		
-		public static Comparator<Sentence> certaintyComparator = new Comparator<Sentence>() {
-			@Override
-			public int compare(Sentence o1, Sentence o2) {
-				//compare by ascending significance
-				//NaN should always be at the end of the list though
-				if(Double.isNaN(o1.certaintyFactor)) {
-					if(Double.isNaN(o2.certaintyFactor))
-						return 0;
-					else
-						return 1;
-				}
-				if(Double.isNaN(o2.certaintyFactor))
-					return -1;
-				
-				return Double.compare(o2.certaintyFactor, o1.certaintyFactor);
-			}
-		};
-		public static Comparator<Sentence> sigComparator = new Comparator<Sentence>() {
-			@Override
-			public int compare(Sentence o1, Sentence o2) {
-				//compare by ascending significance
-				//NaN should always be at the end of the list though
-				if(Double.isNaN(o1.significance)) {
-					if(Double.isNaN(o2.significance))
-						return 0;
-					else
-						return 1;
-				}
-				if(Double.isNaN(o2.significance))
-					return -1;
-				
-				return Double.compare(o2.significance, o1.significance);
-			}
-		};
-		
-		
-		public Sentence(Document source, String sentence, PorterStemmer stemmer) {
-			this.source = source;
-			originalText = sentence.trim();
-			//split for each word
-			String condensed = DataCleaner.condenseSpaces(sentence.toLowerCase().trim());
-			String[] raw = condensed.split(" ");
-			
-			List<String> toWords = new ArrayList<>();
-			for(int i=0; i < raw.length; i++) {
-				if(raw[i].isEmpty())
-					continue;
-				raw[i] = (stemmer!=null)? stemmer.stem(raw[i]) : raw[i];
-				if(!raw[i].isEmpty())
-					toWords.add(raw[i]);
-			}
-			this.words = new String[toWords.size()];
-			words = toWords.toArray(words);
-			
-			significance = 0;
-		}
-		
-		public void setSignificance(double significance) {
-			this.significance = significance;
-		}
-		public double getSignificance() {
-			return significance;
-		}
-		
-		
-		private void findScore(int[] sentsContain, String[] docStems, int numSentences, CountedWords countedWords) {
-			if(countedWords == null) {
-				countedWords = new CountedWords();
-				//populate counted words
-				for(String word: words)
-					countedWords.addWord(word);				
-			} //otherwise, we assume that it was populated for us
-			
-			int maxFreq = 0;
-			for(String word: countedWords.getDistinct()) {
-				int occurences = countedWords.getOccurrences(word);
-				if(occurences > maxFreq)
-					maxFreq = occurences;
-			}
-			
-			double sum = 0;
-			for(int i=0; i<docStems.length; i++) {
-				if(sentsContain[i] == 0) //this gives us divide by zero error
-					continue; //should not occur, since we only review words in the document
-				
-				double tf = countedWords.getOccurrences(docStems[i]) / (double)maxFreq;
-				double idf = Math.log(numSentences / (double)sentsContain[i])/ Math.log(2);
-				sum += tf*idf;
-			}
-			
-			if(Double.isNaN(sum))
-				this.similarityVal = 0;
-			this.similarityVal = sum;
-		}
-		
-		public int contains(String word) {
-			int matches = 0;
-			for(String match: words) {
-				if(match.equals(word))
-					matches++;
-			}
-			return matches;
-		}
-		
-		public int size() {
-			return words.length;
-		}
-		
-		public String getText() {
-			return originalText;
-		}
-		
-		public Document getDocument() {
-			return source;
-		}
-		
-		@Override
-		public String toString() {
-			return "Sentence: " + originalText;
-		}
 	}
 
 }

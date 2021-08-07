@@ -10,26 +10,30 @@ import java.util.Scanner;
 
 import util.OpinRankFiles;
 
+/**
+ * A cleaner for dataset files. In recent updates, this class has been
+ * customized specifically for the format of files in the OpinRank
+ * dataset.
+ */
 public class ReviewCleaner extends DataCleaner {
 
 	public static void main(String args[]) throws IOException {
 		//let's try just cleaning one to start with
 		ReviewCleaner cleaner = new ReviewCleaner();
 		
-		cleaner.cleanAllCars();
-		//cleaner.cleanFile(OpinRankFiles.carFile + "2007//2007_acura_mdx",
-		//		OpinRankFiles.carFile + "2007//acura_mdx.txt", true);
+		//cleaner.cleanCarDirectory(OpinRankFiles.hotelFile);
+		cleaner.cleanDirectory(OpinRankFiles.hotelFile, false);
 	}
 	
-	public void cleanAllCars() {
-		File folder = new File(OpinRankFiles.carFile);
+	public void cleanDirectory(String directory, boolean car) {
+		File folder = new File(directory);
 		List<File> processing = new ArrayList<>();
 		processing.addAll(Arrays.asList(folder.listFiles()));
 
 		List<File> newFiles = new ArrayList<>();
 		while (!processing.isEmpty()) {
 			for (File file : processing) {
-			    if (file.isFile()) {
+			    if (file.isFile() && !file.getName().endsWith(".pdf")) {
 			    	//also we want to make sure not to clean generated files, so break on them
 			    	if(file.getName().contains(".txt"))
 			    		continue;
@@ -38,7 +42,10 @@ public class ReviewCleaner extends DataCleaner {
 			    	String fileName = file.getName();
 			    	String out = path + File.separatorChar + fileName.substring(fileName.indexOf('_')+1) + ".txt";
 			    	try {
-						cleanFile(file.getPath(), out, true);
+			    		if(car)
+			    			cleanCarFile(file.getPath(), out, true);
+			    		else
+			    			cleanHotelFile(file.getPath(), out, true);
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
@@ -54,7 +61,7 @@ public class ReviewCleaner extends DataCleaner {
 		}
 	}
 	
-	public void cleanFile(String inFile, String outFile, boolean sentenceDivision) throws IOException {
+	public void cleanCarFile(String inFile, String outFile, boolean sentenceDivision) throws IOException {
 		//now we need to go about parsing the json file and removing stopwords
 		//we will output to a file "reviews.txt" what we get for each line
 		Scanner scan =  new Scanner(new File(inFile));
@@ -81,6 +88,30 @@ public class ReviewCleaner extends DataCleaner {
 				text = super.removePunctuation(text, true);
 				out.write(text + '\n');
 			}
+		}
+		scan.close();
+		out.close();
+		
+		System.out.println(" Finished!");
+	}
+	
+	public void cleanHotelFile(String inFile, String outFile, boolean sentenceDivision) throws IOException {
+		// The hotel files are in a completely different format than the car reviews.
+		// From what I can tell, it is DATE tab SUBJECT tab BODY
+		Scanner scan =  new Scanner(new File(inFile));
+		FileWriter out = new FileWriter(new File(outFile));
+		System.out.print("Cleaning \"" + inFile + "\"...");
+		out.write("REVIEWS\n");
+		
+		String line;
+		String text;
+		while(scan.hasNextLine()) {
+			line = scan.nextLine();
+			
+			text = line.substring(line.indexOf('\t')+1).replace("\t", " ");
+			text = super.removePunctuation(text, true);
+			out.write(" \"words\": ");
+			out.write(text + '\n');
 		}
 		scan.close();
 		out.close();
