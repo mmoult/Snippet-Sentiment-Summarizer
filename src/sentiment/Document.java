@@ -55,9 +55,10 @@ public class Document {
 			if(tf == 0) //since we multiply tf by idf, we don't have to even calculate idf
 				continue;
 			//idf is a weighted measure of this document's exclusive use of the term 
-			// Typically, we use log[numDocs / docsContain[i]], but if all documents have the term, then we
-			// just get 0. This is problematic since it completely disregards tf
-			double idf = Math.log(2 * numDocs / (double)docsContain[i])/ Math.log(2);
+			// Typically, we use log[numDocs / docsContain[i]], but if all documents have the term, then
+			// inside the log results to 1, and log(1) = 0. Since we multiply tf and idf, this is
+			// problematic since it completely disregards tf
+			double idf = Math.log(1+ numDocs / (double)docsContain[i])/ Math.log(2);
 			sum += tf*idf;
 		}
 		

@@ -5,8 +5,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
 import java.util.Set;
@@ -112,29 +110,6 @@ if(lineNo > 5000)
 			System.out.println("  " + word + ": " + occ);
 		}
 		//System.out.println(facets);
-	}
-	
-	@SuppressWarnings("unused") //this is still in experimental development
-	private static void printGroupedResults(CountedWords facets, Depluralizer stemmer, boolean STEM, boolean printAll, List<String> banned) {
-		FacetGroups groups = new TermTyper.FacetGroups();
-		
-		for(String term: facets.getDistinct()) {
-			if(banned.contains(term))
-				continue;
-			groups.addFacet(term);
-		}
-		List<FacetGroups.Group> sorted = new ArrayList<>(groups.getGroupNames().size());
-		Collections.sort(sorted, (FacetGroups.Group o1, FacetGroups.Group o2) -> {
-			return Integer.compare(-o1.occurrences, -o2.occurrences); //sort descending
-		});
-		
-		for(FacetGroups.Group group: sorted) {
-			//TODO here
-			System.out.println(/*group.name +*/ "(" + group.occurrences + ") {");
-			for(String facet: group.facets)
-				System.out.println("    " + facet);
-			System.out.println("}");
-		}
 	}
 	
 	public TermTyper() {
@@ -518,61 +493,6 @@ if(lineNo > 5000)
 			facet.setLength(0); //clear out the old phrase
 		}
 		typedWords.add(new Pair<>(word, type));
-	}
-	
-	protected static class FacetGroups {
-		protected HashMap<String, Group> map;
-		
-		public void addFacet(String facet) {
-			//We try to match this facet to all current groups
-			//We break apart all the component words in the facet
-			String[] words = facet.split(" ");
-			//now we want to depluralize each term
-			Depluralizer stemmer = new Depluralizer();
-			for(int i=0; i<words.length; i++) {
-				words[i] = stemmer.stem(words[i]);
-			}
-			
-			for(String group: map.keySet()) {
-				//now we try to match for each facet in the group
-				//TODO I need to fix this so I match for single words (or maybe more)
-				//and create groups with group names that represent what is in common
-				Group groupPair = map.get(group);
-				for(String groupFacet: groupPair.facets) {
-					for(String word: words) {
-						if(groupFacet.contains(word)) {
-							// We found a match!
-							groupPair.facets.add(facet);
-							groupPair.occurrences++;
-							return;
-						}
-					}
-				}
-			}
-			
-			//If we made it here, the facet fits no groups.
-			//We create a new group for it, and the group takes its name. Therefore,
-			// the group name is not necessarily representative of the group identity
-			map.put(facet, new Group(facet));
-		}
-		
-		public Set<String> getGroupNames() {
-			return map.keySet();
-		}
-		
-		public Group getGroup(String groupName) {
-			return map.get(groupName);
-		}
-		
-		public class Group {
-			int occurrences = 0;
-			Set<String> facets = new HashSet<>();
-			
-			public Group() {}
-			public Group(String facet) {
-				facets.add(facet);
-			}
-		}
 	}
 
 }

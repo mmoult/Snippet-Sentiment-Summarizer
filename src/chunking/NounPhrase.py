@@ -62,4 +62,4 @@ final = df.groupby(['facets','occurence'])['original_phrase'].apply(lambda x: x.
 final = final.reset_index().sort_values(by=['occurence'], ascending=False)
 final['original_phrase'] = final['original_phrase'].apply(set)
 
-final.to_csv('../../car_facet3.csv')
+final.to_csv('../../car_facet.csv')

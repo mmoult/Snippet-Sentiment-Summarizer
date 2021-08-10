@@ -23,7 +23,7 @@ public class SentimentRanker {
 	protected SentimentAnalyzer analyzer;
 	
 	public static void main(String args[]) throws IOException {
-		final String QUERY = "2006 honda with good steering and brakes";
+		final String QUERY = "montreal hotels downtown area";
 		
 		SentimentRanker ranker = new SentimentRanker();
 		List<String> goodWords = cleanQuery(QUERY);
@@ -51,7 +51,7 @@ public class SentimentRanker {
 		
 		while(!toSearch.isEmpty()) {
 			File analyze = toSearch.pop();
-//TODO do I want to black list any files in the search?
+//If I want to blacklist files in the product search...
 //if(blackList.contains(analyze.getName()))
 //	continue; //skip names matching the blacklist
 			
