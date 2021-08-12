@@ -18,12 +18,13 @@ import parsing.DataCleaner;
 import sentiment.Document.Sentence;
 import util.AmazonFileResources;
 import util.OpinRankFiles;
+import util.PythonBridge;
 
 public class SentimentRanker {
 	protected SentimentAnalyzer analyzer;
 	
 	public static void main(String args[]) throws IOException {
-		final String QUERY = "montreal hotels downtown area";
+		final String QUERY = "honda 2007 fast car luxury";
 		
 		SentimentRanker ranker = new SentimentRanker();
 		List<String> goodWords = cleanQuery(QUERY);
@@ -33,6 +34,7 @@ public class SentimentRanker {
 		String searchPath = OpinRankFiles.root + sep;
 		// For the sake of time, we will blacklist some folders.
 		List<String> blackList = Arrays.asList("2007", "2009", "beijing", "dubai", "london", "montreal", "new-delhi", "shanghai");
+		System.out.println("Determining type of query...");
 		Classifier classifier = new Classifier(false, searchPath, blackList);
 		String path = classifier.classify(goodWords);
 		
@@ -88,12 +90,14 @@ public class SentimentRanker {
 		}
 		//Now we have a list of potential matches called "relevants".
 		//But we only want to have one product to search reviews for.
+		System.out.println("Selecting best product...");
 		if(relevants.size() < 1) {
 			System.err.println("No document matched the query!");
 			return;
 		}else if(relevants.size() == 1)
 			path = relevants.get(0).getPath();
-		else { //We must do some pruning with the content of the files (by tf.idf)
+		else {
+			//We must do some pruning with the content of the files
 			//We want to remove all terms from the query that were used in the file directory.
 			//However, just to be safe, we only want to remove words from the query when
 			// processing files that actually used said terms.
@@ -102,8 +106,34 @@ public class SentimentRanker {
 			for(String word: usedWords)
 				termsRemaining.remove(word);
 			
-			List<Document> files = ranker.rankFileRelevance(termsRemaining, 1, -1, relevants);
-			path = files.get(0).getId();
+			if(termsRemaining.isEmpty()) {
+				path = relevants.get(0).getPath(); //just choose the first since we have nothing
+			}else {
+long startMs = System.currentTimeMillis();
+				/* Rank by tf.idf
+				List<Document> files = ranker.rankFileRelevance(termsRemaining, 1, -1, relevants);
+				path = files.get(0).getId();
+				*/
+				
+				//We are going to try using Word Vectors with Python's spaCy to solve this.
+				StringBuilder fileOptions = new StringBuilder(relevants.get(0).getAbsolutePath());
+				for(int i=1; i<relevants.size(); i++) {
+					fileOptions.append(';');
+					fileOptions.append(relevants.get(i).getAbsolutePath());
+				}
+				StringBuilder goodQuery = new StringBuilder();
+				for(int i=0; i<termsRemaining.size(); i++) {
+					if(i > 0)
+						goodQuery.append(' ');
+					goodQuery.append(termsRemaining.get(i));
+				}
+				//now load the Python script
+				path = PythonBridge.launch("classifying\\FileRanker.py", goodQuery.toString(), fileOptions.toString());
+				path = path.replace("\n", "");
+				//
+long endMs = System.currentTimeMillis();
+System.out.println("Elapsed time: " + (endMs - startMs));
+			}
 		}
 
 		//Now that we have the query-relevant product, we find the most relevant reviews
@@ -147,7 +177,14 @@ System.exit(0);
 		for(Document doc: rankedReviews) {
 			//perform coreference resolution before sentence ranking
 			//TODO we could potentially use multi-threading to speed up this part since it is so slow
-			doc.setText(CoreferenceResolver.resolve(doc.getText()));
+			try {
+				doc.setText(CoreferenceResolver.resolve(doc.getText()));
+			}catch(Exception e) {
+				//if we had some issue, we can notify the user, but we don't *have* to resolve
+				// the references
+				System.err.println("Failed to resolve coreferences of document with text: \"" + doc.getText() + "\".");
+			}
+			
 			done++;
 			System.out.print("Resolving coreferences: "+ ((done*100)/rankedReviews.size())+"%  \r");
 		}
@@ -157,7 +194,7 @@ for(Document doc: rankedReviews) {
 	//temp.write(doc.toString() + '\n');
 	System.out.println("[" + (++iii) + "] " + doc.getText());
 }
-System.exit(0);
+System.exit(0); //END
 
 		System.out.println();
 		List<Sentence> rankedSentences = new ArrayList<>();
@@ -287,7 +324,8 @@ for(int i=0; i<rankedReviews.size(); i++) {
 				String asin = DataCleaner.getStringField(line, "asin", false);
 				
 				String words = line.substring(wordsStart + 9);
-				words = words.substring(0, words.length());
+				if(words.isBlank())
+					continue; //don't add empty documents
 				
 				documents.add(new Document(words, stemmer, asin));
 			}else //in case more lines are to be searched than exist
