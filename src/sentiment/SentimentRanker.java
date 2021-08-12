@@ -88,16 +88,14 @@ public class SentimentRanker {
 					toSearch.push(sub);
 			}
 		}
+		
 		//Now we have a list of potential matches called "relevants".
 		//But we only want to have one product to search reviews for.
 		System.out.println("Selecting best product...");
 		if(relevants.size() < 1) {
 			System.err.println("No document matched the query!");
 			return;
-		}else if(relevants.size() == 1)
-			path = relevants.get(0).getPath();
-		else {
-			//We must do some pruning with the content of the files
+		}else {
 			//We want to remove all terms from the query that were used in the file directory.
 			//However, just to be safe, we only want to remove words from the query when
 			// processing files that actually used said terms.
@@ -105,40 +103,46 @@ public class SentimentRanker {
 			termsRemaining.addAll(goodWords);
 			for(String word: usedWords)
 				termsRemaining.remove(word);
+			goodWords = termsRemaining; //we don't need the original good words anymore
 			
-			if(termsRemaining.isEmpty()) {
-				path = relevants.get(0).getPath(); //just choose the first since we have nothing
-			}else {
+			if(relevants.size() == 1)
+				path = relevants.get(0).getPath();
+			else {
+				//We must do some pruning with the content of the files
+				if(goodWords.isEmpty()) {
+					path = relevants.get(0).getPath(); //just choose the first since we have nothing
+				}else {
 long startMs = System.currentTimeMillis();
-				/* Rank by tf.idf
-				List<Document> files = ranker.rankFileRelevance(termsRemaining, 1, -1, relevants);
-				path = files.get(0).getId();
-				*/
-				
-				//We are going to try using Word Vectors with Python's spaCy to solve this.
-				StringBuilder fileOptions = new StringBuilder(relevants.get(0).getAbsolutePath());
-				for(int i=1; i<relevants.size(); i++) {
-					fileOptions.append(';');
-					fileOptions.append(relevants.get(i).getAbsolutePath());
+					/* Rank by tf.idf
+					List<Document> files = ranker.rankFileRelevance(termsRemaining, 1, -1, relevants);
+					path = files.get(0).getId();
+					*/
+					
+					//We are going to try using Word Vectors with Python's spaCy to solve this.
+					StringBuilder fileOptions = new StringBuilder(relevants.get(0).getAbsolutePath());
+					for(int i=1; i<relevants.size(); i++) {
+						fileOptions.append(';');
+						fileOptions.append(relevants.get(i).getAbsolutePath());
+					}
+					StringBuilder goodQuery = new StringBuilder();
+					for(int i=0; i<goodWords.size(); i++) {
+						if(i > 0)
+							goodQuery.append(' ');
+						goodQuery.append(goodWords.get(i));
+					}
+					//now load the Python script
+					path = PythonBridge.launch("classifying\\FileRanker.py", goodQuery.toString(), fileOptions.toString());
+					path = path.replace("\n", "");
+					//
+	long endMs = System.currentTimeMillis();
+	System.out.println("Elapsed time: " + (endMs - startMs));
 				}
-				StringBuilder goodQuery = new StringBuilder();
-				for(int i=0; i<termsRemaining.size(); i++) {
-					if(i > 0)
-						goodQuery.append(' ');
-					goodQuery.append(termsRemaining.get(i));
-				}
-				//now load the Python script
-				path = PythonBridge.launch("classifying\\FileRanker.py", goodQuery.toString(), fileOptions.toString());
-				path = path.replace("\n", "");
-				//
-long endMs = System.currentTimeMillis();
-System.out.println("Elapsed time: " + (endMs - startMs));
 			}
 		}
 
 		//Now that we have the query-relevant product, we find the most relevant reviews
 		System.out.println("Searching in " + path + " for \"" + QUERY + "\".");
-		//TODO I am not sure if I should use "goodWords" here or "termsRemaining"
+		//We use the modified good words with product terms removed
 		List<Document> rankedReviews = ranker.rankDocRelevance(goodWords, 100, -1, path);
 /*evaluate here how good the document retrieval was
 System.out.println("PRODUCTS RETRIEVED (" + result.size()+")=");

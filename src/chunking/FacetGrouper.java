@@ -36,9 +36,10 @@ public abstract class FacetGrouper {
 		}
 		scan.close();
 		
-		timeWordGrouper(words);
-		timeSmartForce(words);
 		timeBruteForce(words);
+		timeSmartForce(words);
+		timeWordGrouper(words);
+		timeLimitWordGrouper(words);
 	}
 	
 	private static void timeBruteForce(List<TermOcc> terms) {
@@ -58,6 +59,12 @@ public abstract class FacetGrouper {
 		List<TermOcc> results = new WordGrouper().categorize(terms);
 		long now = System.nanoTime();
 		printResults(results, now-nano, "Word groups");
+	}
+	private static void timeLimitWordGrouper(List<TermOcc> terms) {
+		long nano = System.nanoTime();
+		List<TermOcc> results = new LimitWordGrouper().categorize(terms);
+		long now = System.nanoTime();
+		printResults(results, now-nano, "Limit Word groups");
 	}
 	
 	private static void printResults(List<TermOcc> results, long time, String label) {
