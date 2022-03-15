@@ -31,3 +31,5 @@ out.txt
 target/*
 *.csv#
 car_facet.csv
+/bin/
+/target/

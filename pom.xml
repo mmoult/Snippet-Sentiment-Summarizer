@@ -21,5 +21,13 @@
 	  <artifactId>okhttp</artifactId>
 	  <version>4.9.1</version>
 	</dependency>
+	<!-- https://mvnrepository.com/artifact/edu.stanford.nlp/stanford-pos-tagger -->
+<!-- 
+	<dependency>
+	    <groupId>edu.stanford.nlp</groupId>
+	    <artifactId>stanford-pos-tagger</artifactId>
+	    <version>3.0.2</version>
+	</dependency>
+-->
   </dependencies>
 </project>

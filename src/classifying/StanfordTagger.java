@@ -2,12 +2,13 @@ package classifying;
 
 import static classifying.PartOfSpeechTagger.PartOfSpeech.*;
 
+import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
 import edu.stanford.nlp.ling.HasWord;
-import edu.stanford.nlp.ling.SentenceUtils;
+import edu.stanford.nlp.ling.Sentence;
 import edu.stanford.nlp.ling.TaggedWord;
 import edu.stanford.nlp.tagger.maxent.MaxentTagger;
 import util.AmazonFileResources;
@@ -23,7 +24,11 @@ public class StanfordTagger implements PartOfSpeechTagger {
 	}
 	
 	public StanfordTagger() {
-		tagger = new MaxentTagger(AmazonFileResources.fileRoot + "english-left3words-distsim.tagger");
+		try {
+			tagger = new MaxentTagger(AmazonFileResources.fileRoot + "english-left3words-distsim.tagger");
+		} catch (ClassNotFoundException | IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	@Override
@@ -33,7 +38,7 @@ public class StanfordTagger implements PartOfSpeechTagger {
 		
 		for (List<HasWord> sentence : sentences) {
 			List<TaggedWord> tSentence = tagger.tagSentence(sentence);
-			String res = SentenceUtils.listToString(tSentence, false);
+			String res = Sentence.listToString(tSentence, false);
 			String[] parts = res.split(" ");
 			
 			for(String part: parts) {
